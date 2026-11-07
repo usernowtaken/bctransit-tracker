@@ -1,0 +1,769 @@
+"""Victoria Bus Radar V2.4: unofficial Greater Victoria live vehicle map.
+
+Requires Python >=3.10, gtfs-realtime-bindings, tzdata (Windows timezone lookup).
+All predictions are schedule-based and unconfirmed.
+"""
+from __future__ import annotations
+
+import argparse
+from collections import defaultdict
+import csv
+from datetime import datetime, timedelta, timezone
+import gzip
+import io
+import json
+import math
+import mimetypes
+import os
+from pathlib import Path
+import threading
+import time
+import urllib.parse
+import urllib.request
+import webbrowser
+import zipfile
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from typing import Any
+from zoneinfo import ZoneInfo
+
+try:
+    from google.transit import gtfs_realtime_pb2
+except ImportError as exc:
+    raise SystemExit("Missing GTFS decoder. Run setup.bat or pip install -r requirements.txt") from exc
+
+BASE = Path(__file__).resolve().parent
+WEB_DIR = BASE / "web"
+CACHE_DIR = BASE / "cache"
+INDEX_PATH = CACHE_DIR / "gtfs_v2.json.gz"
+VEHICLE_URL = os.environ.get("BCT_VEHICLE_URL", "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=48")
+STATIC_URL = os.environ.get("BCT_STATIC_URL", "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=48")
+POLL_SECONDS = max(15, int(os.environ.get("BCT_POLL_SECONDS", "15")))
+MAX_FEED_BYTES = 12 * 1024 * 1024
+MAX_ZIP_BYTES = 85 * 1024 * 1024
+REQUEST_TIMEOUT = 16
+USER_AGENT = "VictoriaBusRadar/2.4 (unofficial public transit map)"
+TIMEZONE = ZoneInfo("America/Vancouver")
+MIN_LAT, MAX_LAT, MIN_LON, MAX_LON = 48.15, 49.05, -124.50, -122.70
+OFF_ROUTE_THRESHOLD_M = 600  # conservative flag, not an official NIS designation
+NEAR_ROUTE_THRESHOLD_M = 300
+MAX_POSITION_AGE_S = 300
+FALLBACK_COLORS = ("#5de2bd", "#75b8fa", "#f3c569", "#bd9cfa", "#ff938a", "#86d7de", "#cbdc81")
+
+
+def fetch_bytes(url: str, max_bytes: int) -> bytes:
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/octet-stream,*/*"})
+    with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT) as response:
+        length = response.headers.get("Content-Length")
+        if length and int(length) > max_bytes:
+            raise ValueError("Remote file larger than permitted")
+        result = response.read(max_bytes + 1)
+        if len(result) > max_bytes:
+            raise ValueError("Remote file exceeded download limit")
+        return result
+
+
+def parse_vehicle_feed(body: bytes) -> tuple[list[dict[str, Any]], int | None]:
+    feed = gtfs_realtime_pb2.FeedMessage()
+    feed.ParseFromString(body)
+    if not feed.HasField("header"):
+        raise ValueError("Missing GTFS-Realtime header")
+    stamp = int(feed.header.timestamp) if feed.header.HasField("timestamp") else None
+    output = []
+    for entity in feed.entity:
+        if not entity.HasField("vehicle") or entity.is_deleted:
+            continue
+        vehicle = entity.vehicle
+        if not vehicle.HasField("position"):
+            continue
+        position = vehicle.position
+        lat, lon = float(position.latitude), float(position.longitude)
+        if not (math.isfinite(lat) and math.isfinite(lon) and MIN_LAT <= lat <= MAX_LAT and MIN_LON <= lon <= MAX_LON):
+            continue
+        descriptor = vehicle.vehicle if vehicle.HasField("vehicle") else None
+        trip = vehicle.trip if vehicle.HasField("trip") else None
+        identity = (descriptor.id if descriptor and descriptor.id else entity.id) or entity.id
+        output.append({
+            "id": str(identity), "lat": round(lat, 6), "lon": round(lon, 6),
+            "bearing": round(position.bearing, 1) if position.HasField("bearing") else None,
+            "speed_mps": round(position.speed, 2) if position.HasField("speed") else None,
+            "timestamp": int(vehicle.timestamp) if vehicle.HasField("timestamp") else stamp,
+            "timestamp_source": "vehicle" if vehicle.HasField("timestamp") else "feed",
+            "route_id": trip.route_id if trip and trip.route_id else None,
+            "trip_id": trip.trip_id if trip and trip.trip_id else None,
+            "start_date": trip.start_date if trip and trip.start_date else None,
+            "start_time": trip.start_time if trip and trip.start_time else None,
+            "label": descriptor.label if descriptor and descriptor.label else None,
+            "stop_sequence": int(vehicle.current_stop_sequence) if vehicle.HasField("current_stop_sequence") else None,
+            "stop_id": vehicle.stop_id if vehicle.HasField("stop_id") else None,
+            "stop_status": int(vehicle.current_status) if vehicle.HasField("current_status") else 2,
+            "occupancy": int(vehicle.occupancy_status) if vehicle.HasField("occupancy_status") else None,
+            "congestion": int(vehicle.congestion_level) if vehicle.HasField("congestion_level") else None,
+        })
+    return output, stamp
+
+
+def _csv_rows(archive: zipfile.ZipFile, filename: str, required: bool = True):
+    match = next((part for part in archive.namelist() if part.rsplit("/", 1)[-1].lower() == filename), None)
+    if not match:
+        if required:
+            raise ValueError(f"GTFS missing {filename}")
+        return
+    entry = archive.getinfo(match)
+    if entry.file_size > 180 * 1024 * 1024:
+        raise ValueError(f"GTFS {filename} exceeds safety limit")
+    with archive.open(match) as binary:
+        reader = csv.DictReader(io.TextIOWrapper(binary, encoding="utf-8-sig", newline=""))
+        yield from reader
+
+
+def _gtfs_time(value: str | None) -> int | None:
+    try:
+        h, m, s = [int(part) for part in (value or "").split(":")]
+        if 0 <= h <= 48 and 0 <= m < 60 and 0 <= s < 60:
+            return h * 3600 + m * 60 + s
+    except (ValueError, TypeError):
+        pass
+    return None
+
+
+def _safe_hex(value: str | None) -> str | None:
+    value = (value or "").strip().lstrip("#")
+    if len(value) == 6 and all(ch in "0123456789ABCDEFabcdef" for ch in value):
+        return f"#{value.upper()}"
+    return None
+
+
+def _simplify(points: list[list[float]], tolerance_m: float = 9.0) -> list[list[float]]:
+    """Lightweight Douglas–Peucker in local projected metres. Coordinates [lat, lon]."""
+    if len(points) <= 2:
+        return points
+    lat_scale = 111000.0
+    lon_scale = 111000.0 * math.cos(math.radians(points[len(points)//2][0]))
+    xy = [(p[1] * lon_scale, p[0] * lat_scale) for p in points]
+    keep = {0, len(points) - 1}
+    stack = [(0, len(points)-1)]
+    threshold = tolerance_m*tolerance_m
+    while stack:
+        start, end = stack.pop()
+        x1, y1 = xy[start]; x2, y2 = xy[end]
+        dx, dy = x2-x1, y2-y1
+        length2 = dx*dx + dy*dy
+        worst, idx = -1.0, None
+        for i in range(start+1, end):
+            x,y = xy[i]
+            u = max(0.0, min(1.0, ((x-x1)*dx + (y-y1)*dy)/length2)) if length2 else 0
+            dist = (x-x1-u*dx)**2 + (y-y1-u*dy)**2
+            if dist > worst:
+                worst, idx = dist, i
+        if worst > threshold and idx is not None:
+            keep.add(idx)
+            stack.extend([(start,idx),(idx,end)])
+    return [points[i] for i in sorted(keep)]
+
+
+def parse_static_gtfs(blob: bytes) -> dict[str, Any]:
+    routes, trips, stops, shapes, service_days, exceptions = {}, {}, {}, {}, {}, defaultdict(dict)
+    trip_stops = defaultdict(list)
+    blocks = defaultdict(list)
+    with zipfile.ZipFile(io.BytesIO(blob)) as archive:
+        for row in _csv_rows(archive, "routes.txt"):
+            rid = (row.get("route_id") or "").strip()
+            if rid:
+                routes[rid] = {"short": (row.get("route_short_name") or "").strip(),
+                               "long": (row.get("route_long_name") or "").strip(),
+                               "color": _safe_hex(row.get("route_color")),
+                               "text_color": _safe_hex(row.get("route_text_color"))}
+        for row in _csv_rows(archive, "trips.txt"):
+            tid = (row.get("trip_id") or "").strip()
+            if tid:
+                trips[tid] = {"route_id": (row.get("route_id") or "").strip(),
+                              "headsign": (row.get("trip_headsign") or "").strip(),
+                              "block_id": (row.get("block_id") or "").strip(),
+                              "service_id": (row.get("service_id") or "").strip(),
+                              "shape_id": (row.get("shape_id") or "").strip(),
+                              "first": None, "last": None}
+        for row in _csv_rows(archive, "stops.txt"):
+            sid = (row.get("stop_id") or "").strip()
+            if not sid:
+                continue
+            try:
+                lat, lon = float(row.get("stop_lat") or ""), float(row.get("stop_lon") or "")
+                if not (math.isfinite(lat) and math.isfinite(lon)):
+                    continue
+            except ValueError:
+                continue
+            stops[sid] = [row.get("stop_name") or "Unknown stop", round(lat, 6), round(lon, 6)]
+        for row in _csv_rows(archive, "stop_times.txt"):
+            tid = row.get("trip_id") or ""
+            if tid not in trips:
+                continue
+            try:
+                sequence = int(row.get("stop_sequence") or "")
+            except ValueError:
+                continue
+            arrival = _gtfs_time(row.get("arrival_time"))
+            departure = _gtfs_time(row.get("departure_time"))
+            # No time at non-timepoint stops is normal. Use available endpoints.
+            trip_stops[tid].append([sequence, row.get("stop_id") or "", arrival, departure])
+        for tid, entries in trip_stops.items():
+            entries.sort(key=lambda r: r[0])
+            times = [v for r in entries for v in r[2:] if v is not None]
+            if times:
+                trips[tid]["first"] = entries[0][3] if entries[0][3] is not None else entries[0][2]
+                trips[tid]["last"] = entries[-1][2] if entries[-1][2] is not None else entries[-1][3]
+                if trips[tid]["first"] is None: trips[tid]["first"] = min(times)
+                if trips[tid]["last"] is None: trips[tid]["last"] = max(times)
+            if trips[tid]["block_id"] and trips[tid]["first"] is not None:
+                blocks[trips[tid]["block_id"]].append(tid)
+        for block_trips in blocks.values():
+            block_trips.sort(key=lambda tid: trips[tid]["first"])
+        for row in _csv_rows(archive, "calendar.txt", required=False):
+            service_id = row.get("service_id") or ""
+            if service_id:
+                service_days[service_id] = {"start": row.get("start_date") or "", "end": row.get("end_date") or "",
+                    "weekdays": [row.get(day) == "1" for day in ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")]}
+        for row in _csv_rows(archive, "calendar_dates.txt", required=False):
+            service_id = row.get("service_id") or ""
+            if service_id and (row.get("exception_type") or "") in ("1", "2"):
+                exceptions[service_id][row.get("date") or ""] = int(row["exception_type"])
+        # Shape points only are prepared for on-demand detail requests, never sent in bulk.
+        raw_shapes = defaultdict(list)
+        for row in _csv_rows(archive, "shapes.txt", required=False):
+            sid = (row.get("shape_id") or "").strip()
+            if not sid:
+                continue
+            try:
+                lat, lon = float(row["shape_pt_lat"]), float(row["shape_pt_lon"])
+                seq = int(row["shape_pt_sequence"])
+            except (KeyError, ValueError):
+                continue
+            if math.isfinite(lat) and math.isfinite(lon):
+                raw_shapes[sid].append((seq, [round(lat,6), round(lon,6)]))
+        for sid, items in raw_shapes.items():
+            items.sort(key=lambda p:p[0])
+            simplified = _simplify([p for _,p in items])
+            if len(simplified) > 2400:
+                step = math.ceil(len(simplified)/2400)
+                simplified = simplified[::step] + ([simplified[-1]] if simplified[-1] != simplified[::step][-1] else [])
+            shapes[sid] = simplified
+    if not routes or not trips:
+        raise ValueError("GTFS routes or trips missing")
+    route_shapes = build_route_shapes(trips, shapes)
+    return {"routes": routes, "trips": trips, "stops": stops, "trip_stops": dict(trip_stops),
+            "shapes": shapes, "route_shapes": route_shapes, "blocks": dict(blocks), "service_days": service_days,
+            "exceptions": dict(exceptions), "updated_at": int(time.time())}
+
+
+def build_route_shapes(trips: dict[str, Any], shapes: dict[str, Any]) -> dict[str, list[str]]:
+    """Group unique shape IDs by public route, avoiding per-vehicle trip scans."""
+    grouped = defaultdict(set)
+    for trip in trips.values():
+        rid, sid = trip.get("route_id"), trip.get("shape_id")
+        if rid and sid and sid in shapes:
+            grouped[rid].add(sid)
+    return {rid:sorted(sids) for rid,sids in grouped.items()}
+
+
+def service_active(index: dict[str, Any], service_id: str, date: datetime) -> bool:
+    ymd = date.strftime("%Y%m%d")
+    exception = index.get("exceptions", {}).get(service_id, {}).get(ymd)
+    if exception is not None:
+        return exception == 1
+    calendar = index.get("service_days", {}).get(service_id)
+    return bool(calendar and calendar["start"] <= ymd <= calendar["end"] and calendar["weekdays"][date.weekday()])
+
+
+def resolve_service_day(index: dict[str, Any], vehicle: dict[str, Any], now: datetime) -> datetime | None:
+    trip = index.get("trips", {}).get(vehicle.get("trip_id") or "", {})
+    service_id = trip.get("service_id")
+    if not service_id:
+        return None
+    start_date = vehicle.get("start_date")
+    if start_date:
+        try:
+            candidate = datetime.strptime(start_date, "%Y%m%d")
+        except ValueError:
+            return None
+        return candidate if service_active(index, service_id, candidate) else None
+    first, last = trip.get("first"), trip.get("last")
+    if first is None or last is None:
+        return None
+    current = now.hour*3600 + now.minute*60 + now.second
+    for offset in (0, -1):
+        candidate = now + timedelta(days=offset)
+        if not service_active(index, service_id, candidate):
+            continue
+        current_relative = current - offset*86400
+        if first-7200 <= current_relative <= last+7200:
+            return candidate
+    return None
+
+
+def _stop_brief(index: dict[str, Any], entry: list) -> dict[str, Any] | None:
+    stop = index.get("stops", {}).get(entry[1])
+    if not stop:
+        return None
+    sec = entry[2] if entry[2] is not None else entry[3]
+    return {"id": entry[1], "sequence": entry[0], "name": stop[0], "lat": stop[1], "lon": stop[2],
+            "scheduled": f"{(sec//3600)%24:02d}:{(sec%3600)//60:02d}" if sec is not None else None}
+
+
+def stop_context(index: dict[str, Any], vehicle: dict[str, Any], now: datetime) -> dict[str, Any]:
+    entries = index.get("trip_stops", {}).get(vehicle.get("trip_id") or "", [])
+    if not entries:
+        return {"basis": "unavailable", "previous": None, "next": None, "upcoming": []}
+    current_index = None
+    seq = vehicle.get("stop_sequence")
+    if seq is not None:
+        current_index = next((i for i, r in enumerate(entries) if r[0] == seq), None)
+    if current_index is None and vehicle.get("stop_id"):
+        current_index = next((i for i, r in enumerate(entries) if r[1] == vehicle["stop_id"]), None)
+    if current_index is not None:
+        # 'STOPPED_AT': stop_sequence points to stop being served, not next stop.
+        at_stop = vehicle.get("stop_status") == 1
+        next_index = current_index+1 if at_stop else current_index
+        previous_index = current_index if at_stop else current_index-1
+        basis = "Reported stop position"
+    else:
+        # Timetable estimate; not a claim that the bus actually reached that stop.
+        service_day = resolve_service_day(index, vehicle, now)
+        if service_day is None:
+            return {"basis": "unavailable", "previous": None, "next": None, "upcoming": []}
+        offset = (now.date() - service_day.date()).days * 86400
+        current_sec = now.hour*3600 + now.minute*60 + now.second + offset
+        next_index = next((i for i, r in enumerate(entries) if (r[2] if r[2] is not None else r[3]) is not None
+                       and (r[2] if r[2] is not None else r[3]) >= current_sec), len(entries))
+        previous_index = next_index-1
+        basis = "Timetable estimate (not GPS-confirmed)"
+    prev = _stop_brief(index, entries[previous_index]) if 0 <= previous_index < len(entries) else None
+    nxt = _stop_brief(index, entries[next_index]) if 0 <= next_index < len(entries) else None
+    upcoming = [_stop_brief(index, entry) for entry in entries[next_index:next_index+5]]
+    return {"basis": basis, "previous": prev, "next": nxt, "upcoming": [x for x in upcoming if x]}
+
+
+def next_run(index: dict[str, Any], vehicle: dict[str, Any], now: datetime) -> dict[str, Any] | None:
+    trip_id = vehicle.get("trip_id") or ""
+    trip = index.get("trips", {}).get(trip_id)
+    if not trip or not trip.get("block_id") or trip.get("last") is None:
+        return None
+    # Avoid predictions for vehicles with stale/outdated or unspecified position timestamps.
+    stamp = vehicle.get("timestamp")
+    if not isinstance(stamp, int) or abs(now.timestamp()-stamp) > 600:
+        return None
+    service_day = resolve_service_day(index, vehicle, now)
+    if service_day is None:
+        return None
+    current_end = trip["last"]
+    options = []
+    for tid in index.get("blocks", {}).get(trip["block_id"], []):
+        if tid == trip_id:
+            continue
+        nxt = index["trips"][tid]
+        first = nxt.get("first")
+        if first is None or first < current_end-60 or first-current_end > 4*3600:
+            continue
+        if not service_active(index, nxt.get("service_id") or "", service_day):
+            continue
+        options.append((first, tid))
+    if not options:
+        return None
+    first, tid = min(options)
+    candidate = index["trips"][tid]
+    route = index["routes"].get(candidate["route_id"], {})
+    current_route_id = trip.get("route_id")
+    return {"route": route.get("short") or None,
+            "route_name": route.get("long") or None,
+            "headsign": candidate.get("headsign") or None,
+            "trip_id": tid,
+            "starts_at": f"{(first//3600)%24:02d}:{(first%3600)//60:02d}" + (" (+1d)" if first>=86400 else ""),
+            "different_route": candidate.get("route_id") != current_route_id,
+            "basis": "GTFS block schedule — unconfirmed vehicle assignment"}
+
+
+
+def route_distance_m(lat: float, lon: float, polyline: list[list[float]]) -> float | None:
+    """Minimum GPS-to-polyline distance in local projected metres (not to stops).
+
+    Segments rather than vertices are essential: a bus can be on a long segment
+    even when it is far from the closest recorded GTFS shape point.
+    """
+    if len(polyline) < 2:
+        return None
+    x_scale = 111195.0 * math.cos(math.radians(lat))
+    y_scale = 111195.0
+    best_sq = float("inf")
+    last = polyline[0]
+    for point in polyline[1:]:
+        ax, ay = (last[1] - lon)*x_scale, (last[0] - lat)*y_scale
+        bx, by = (point[1] - lon)*x_scale, (point[0] - lat)*y_scale
+        dx, dy = bx-ax, by-ay
+        length_sq = dx*dx + dy*dy
+        t = max(0.0, min(1.0, -(ax*dx + ay*dy)/length_sq)) if length_sq else 0.0
+        dist_sq = (ax+t*dx)**2 + (ay+t*dy)**2
+        best_sq = min(best_sq, dist_sq)
+        last = point
+    return math.sqrt(best_sq)
+
+
+def route_proximity(index: dict[str, Any], vehicle: dict[str, Any], now_ts: float | None = None) -> dict[str, Any]:
+    """Assess the *reported trip* only. Unknown != NIS and far != confirmed NIS."""
+    unknown = {"state": "unknown", "distance_m": None, "basis": "No comparable scheduled trip path"}
+    trip_id = vehicle.get("trip_id")
+    trip = index.get("trips", {}).get(trip_id or "")
+    if not trip:
+        return unknown
+    # Conflicting IDs are often a transition in progress; do not compare
+    # one route's badge against another trip's shape.
+    if vehicle.get("route_id") and trip.get("route_id") and vehicle["route_id"] != trip["route_id"]:
+        return {**unknown, "basis": "Realtime route and scheduled trip disagree"}
+    shape = index.get("shapes", {}).get(trip.get("shape_id") or "", [])
+    if len(shape) < 2:
+        return {**unknown, "basis": "Scheduled trip has no usable route shape"}
+    stamp = vehicle.get("timestamp")
+    now_ts = time.time() if now_ts is None else now_ts
+    if not isinstance(stamp, (int,float)) or stamp <= 0 or not -60 <= now_ts-stamp <= MAX_POSITION_AGE_S:
+        return {**unknown, "basis": "GPS timestamp missing or stale"}
+    try:
+        distance = route_distance_m(float(vehicle["lat"]), float(vehicle["lon"]), shape)
+    except (TypeError, ValueError, KeyError):
+        return unknown
+    if distance is None:
+        return unknown
+    basis = "GPS distance to scheduled GTFS trip shape"
+    # A route may have branches, short turns and direction variants. If the
+    # specific trip shape looks far away, also check other shapes on that *same*
+    # route to avoid false NIS warnings for legitimate route variants.
+    if distance > OFF_ROUTE_THRESHOLD_M:
+        lat, lon = float(vehicle["lat"]), float(vehicle["lon"])
+        for shape_id in index.get("route_shapes", {}).get(trip.get("route_id"), []):
+            if shape_id == trip.get("shape_id"):
+                continue
+            other = index.get("shapes", {}).get(shape_id, [])
+            if len(other) >= 2:
+                alternate_dist = route_distance_m(lat, lon, other)
+                if alternate_dist is not None and alternate_dist < distance:
+                    distance = alternate_dist
+                    basis = "GPS distance to another published shape for reported route"
+                if distance <= NEAR_ROUTE_THRESHOLD_M:
+                    break
+    return {"state": "far" if distance > OFF_ROUTE_THRESHOLD_M else "near",
+            "distance_m": round(distance), "basis": basis,
+            "threshold_m": OFF_ROUTE_THRESHOLD_M}
+
+
+def update_proximity_observations(index: dict[str, Any], vehicles: list[dict[str, Any]],
+                                  previous: dict[str, dict[str, Any]], now_ts: float | None = None
+                                  ) -> dict[str, dict[str, Any]]:
+    """Confirm a potential deadhead only after two DISTINCT fresh GPS observations.
+
+    Repeated feed downloads of the identical GPS timestamp/position never
+    increase the counter, and changing trips resets the confirmation.
+    """
+    now_ts = time.time() if now_ts is None else now_ts
+    updated = {}
+    for vehicle in vehicles:
+        ident = vehicle.get("id")
+        if not ident:
+            continue
+        proximity = route_proximity(index, vehicle, now_ts)
+        prior = previous.get(ident, {})
+        trip_id = vehicle.get("trip_id")
+        stamp = vehicle.get("timestamp")
+        coords = (vehicle.get("lat"), vehicle.get("lon"))
+        same_trip = prior.get("trip_id") == trip_id
+        # After a long reporting gap, restart the off-route evidence streak.
+        if isinstance(stamp, (int, float)) and isinstance(prior.get("timestamp"), (int, float)):
+            if stamp - prior["timestamp"] > MAX_POSITION_AGE_S:
+                same_trip = False
+        # When only the GTFS-RT feed header time is available, a new header
+        # timestamp is NOT proof of a new vehicle GPS fix. Require movement.
+        same_observation = same_trip and (prior.get("timestamp") == stamp and prior.get("coords") == coords
+            or (vehicle.get("timestamp_source") == "feed" and prior.get("coords") == coords))
+        if proximity["state"] == "far":
+            count = prior.get("far_observations", 0) if same_trip and prior.get("state") in ("far", "possible_nis") else 0
+            if not same_observation:
+                count += 1
+            elif count == 0:
+                count = 1
+            proximity["state"] = "possible_nis" if count >= 2 else "far"
+            proximity["observations"] = count
+        else:
+            count = 0
+        updated[ident] = {**proximity, "trip_id": trip_id, "timestamp": stamp,
+                          "coords": coords, "far_observations": count}
+    return updated
+
+
+def route_color(route: dict[str, Any], route_id: str | None) -> str:
+    if route.get("color"):
+        return route["color"]
+    value = route.get("short") or route_id or "0"
+    n = 0
+    for c in value:
+        n = (n*33 + ord(c)) % len(FALLBACK_COLORS)
+    return FALLBACK_COLORS[n]
+
+
+class Tracker:
+    def __init__(self) -> None:
+        self.lock = threading.RLock()
+        self.index: dict[str, Any] = {"routes": {}, "trips": {}, "updated_at": None}
+        self.vehicles: list[dict[str, Any]] = []
+        self.proximity_observations: dict[str, dict[str, Any]] = {}
+        self.feed_timestamp: int | None = None
+        self.fetched_at: int | None = None
+        self.last_error: str | None = None
+        self.gtfs_error: str | None = None
+        self.revision = 0
+        self._snapshot_cache = None
+        self._load_index()
+
+    def _load_index(self) -> None:
+        try:
+            with gzip.open(INDEX_PATH, "rt", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data.get("routes"), dict) and isinstance(data.get("trip_stops"), dict):
+                if "route_shapes" not in data:
+                    data["route_shapes"] = build_route_shapes(data.get("trips", {}), data.get("shapes", {}))
+                self.index = data
+                print(f"[GTFS] Loaded local cache: {len(data['trips'])} trips")
+        except (OSError, ValueError, TypeError, AttributeError):
+            pass
+
+    def update_index(self, index: dict[str, Any], persist: bool = True) -> None:
+        if "route_shapes" not in index:
+            index["route_shapes"] = build_route_shapes(index.get("trips", {}), index.get("shapes", {}))
+        with self.lock:
+            self.index = index
+            # A refreshed GTFS shape may differ; retain only matching observations.
+            self.proximity_observations = update_proximity_observations(
+                index, self.vehicles, {}, time.time())
+            self.gtfs_error = None
+            self.revision += 1
+            self._snapshot_cache = None
+        if persist:
+            try:
+                CACHE_DIR.mkdir(exist_ok=True)
+                temp = INDEX_PATH.with_suffix(".tmp")
+                with gzip.open(temp, "wt", encoding="utf-8", compresslevel=5) as f:
+                    json.dump(index, f, separators=(",", ":"))
+                temp.replace(INDEX_PATH)
+            except OSError as exc:
+                print(f"[GTFS] Cache save failed: {exc}")
+
+    def update_feed(self, data: bytes) -> None:
+        vehicles, stamp = parse_vehicle_feed(data)
+        with self.lock:
+            self.vehicles = vehicles
+            self.proximity_observations = update_proximity_observations(
+                self.index, vehicles, self.proximity_observations, time.time())
+            self.feed_timestamp = stamp
+            self.fetched_at = int(time.time())
+            self.last_error = None
+            self.revision += 1
+            self._snapshot_cache = None
+
+    def snapshot(self, since: int | None = None) -> dict[str, Any]:
+        with self.lock:
+            # An off-route warning must expire even if BC Transit stops sending
+            # new frames. Bump revision so browsers polling with ?since=...
+            # receive a fresh snapshot rather than a perpetual unchanged reply.
+            if self._snapshot_cache is not None and any(
+                    v.get("route_proximity", {}).get("state") in ("far", "possible_nis")
+                    and isinstance(v.get("timestamp"), (int, float))
+                    and time.time()-v["timestamp"] > MAX_POSITION_AGE_S
+                    for v in self._snapshot_cache.get("vehicles", [])):
+                self._snapshot_cache = None
+                self.revision += 1
+            if since is not None and since == self.revision:
+                return {"unchanged": True, "revision": self.revision, "server_now": int(time.time()),
+                        "error": self.last_error, "metadata_error": self.gtfs_error}
+            if self._snapshot_cache is not None:
+                return {**self._snapshot_cache, "server_now": int(time.time()),
+                        "error": self.last_error, "metadata_error": self.gtfs_error}
+            index = self.index
+            now = datetime.fromtimestamp(time.time(), TIMEZONE)
+            enriched = []
+            for v in self.vehicles:
+                trip = index["trips"].get(v.get("trip_id") or "", {})
+                rid = v.get("route_id") or trip.get("route_id")
+                route = index["routes"].get(rid or "", {})
+                public_route = route.get("short") or None
+                if not public_route and rid and len(rid) <= 4 and rid.replace("X", "").isdigit():
+                    public_route = rid
+                proximity = self.proximity_observations.get(v.get("id") or "")
+                if not proximity or proximity.get("trip_id") != v.get("trip_id") or proximity.get("timestamp") != v.get("timestamp"):
+                    proximity = update_proximity_observations(index, [v], {}, now.timestamp()).get(v.get("id") or "", {})
+                # If a previously valid GPS observation has since gone stale,
+                # stop claiming a confirmed proximity classification.
+                if not isinstance(v.get("timestamp"), (int, float)) or now.timestamp()-v["timestamp"] > MAX_POSITION_AGE_S:
+                    proximity = route_proximity(index, v, now.timestamp())
+                public_proximity = {key:proximity.get(key) for key in ("state", "distance_m", "basis", "threshold_m", "observations")}
+                enriched.append({**v, "route": public_route, "route_name": route.get("long") or None,
+                    "route_proximity": public_proximity,
+                    "headsign": trip.get("headsign") or None, "route_color": route_color(route, rid),
+                    "route_text_color": route.get("text_color") or None,
+                    "block_id": trip.get("block_id") or None,
+                    "stops": stop_context(index, v, now), "next_run": next_run(index, v, now)})
+            result = {"vehicles": enriched, "count": len(enriched), "feed_timestamp": self.feed_timestamp,
+                      "fetched_at": self.fetched_at, "revision": self.revision,
+                      "poll_seconds": POLL_SECONDS, "metadata_ready": bool(index["routes"]),
+                      "metadata_updated_at": index.get("updated_at"),
+                      "source": "BC Transit / Victoria Regional Transit System"}
+            self._snapshot_cache = result
+            return {**result, "server_now": int(time.time()), "error": self.last_error,
+                    "metadata_error": self.gtfs_error}
+
+    def route_detail(self, trip_id: str) -> dict[str, Any] | None:
+        with self.lock:
+            index = self.index
+            trip = index["trips"].get(trip_id)
+            if not trip:
+                return None
+            route = index["routes"].get(trip["route_id"], {})
+            rows = index.get("trip_stops", {}).get(trip_id, [])
+            return {"trip_id": trip_id, "route": route.get("short"), "headsign": trip.get("headsign"),
+                    "color": route_color(route, trip["route_id"]),
+                    "shape": index.get("shapes", {}).get(trip.get("shape_id") or "", []),
+                    "stops": [brief for item in rows if (brief := _stop_brief(index,item))]}
+
+
+def _vehicle_worker(tracker: Tracker) -> None:
+    while True:
+        try:
+            data = fetch_bytes(VEHICLE_URL, MAX_FEED_BYTES)
+            tracker.update_feed(data)
+            print(f"[vehicles] {len(tracker.vehicles)} vehicles / {time.strftime('%H:%M:%S')}")
+        except Exception as exc:
+            with tracker.lock:
+                tracker.last_error = f"Vehicle feed: {exc}"
+            print(f"[vehicles] ERROR: {exc}")
+        time.sleep(POLL_SECONDS)
+
+
+def _static_worker(tracker: Tracker) -> None:
+    while True:
+        age = time.time() - (tracker.index.get("updated_at") or 0)
+        if age < 24*3600:
+            time.sleep(min(300, max(30, 24*3600-age)))
+            continue
+        try:
+            print("[GTFS] Fetching stops, shapes, trips and vehicle blocks...")
+            index = parse_static_gtfs(fetch_bytes(STATIC_URL, MAX_ZIP_BYTES))
+            tracker.update_index(index)
+            print(f"[GTFS] {len(index['routes'])} routes, {len(index['trips'])} trips, "
+                  f"{len(index['blocks'])} scheduled blocks, {len(index['shapes'])} shapes")
+        except Exception as exc:
+            with tracker.lock:
+                tracker.gtfs_error = f"Schedule data: {exc}"
+            print(f"[GTFS] ERROR: {exc}")
+            time.sleep(600)
+
+
+mimetypes.add_type("application/manifest+json", ".webmanifest")
+
+
+class Handler(SimpleHTTPRequestHandler):
+    tracker: Tracker
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=str(WEB_DIR), **kwargs)
+
+    def do_GET(self) -> None:
+        parsed = urllib.parse.urlsplit(self.path)
+        if parsed.path == "/config.js" and os.environ.get("CARTO_BASEMAPS_KEY"):
+            # Public basemap browser keys are not secrets. Restrict yours to the deployment host.
+            self._javascript("window.BUS_RADAR_CONFIG = {cartoKey: " +
+                             json.dumps(os.environ["CARTO_BASEMAPS_KEY"]) + "};\n")
+            return
+        if parsed.path == "/api/vehicles":
+            params = urllib.parse.parse_qs(parsed.query)
+            try: since = int(params.get("since", [""])[0])
+            except ValueError: since = None
+            self._json(self.tracker.snapshot(since))
+            return
+        if parsed.path == "/api/route":
+            params = urllib.parse.parse_qs(parsed.query)
+            trip_id = params.get("trip_id", [""])[0]
+            if not trip_id or len(trip_id) > 256:
+                self._json({"error": "Missing trip ID"}, 400)
+                return
+            detail = self.tracker.route_detail(trip_id)
+            if detail is None:
+                self._json({"error": "No GTFS trip metadata for this vehicle"}, 404)
+            else:
+                self._json(detail)
+            return
+        if parsed.path == "/api/health":
+            snap = self.tracker.snapshot()
+            self._json({k:v for k,v in snap.items() if k != "vehicles"})
+            return
+        if parsed.path == "/":
+            self.path = "/index.html"
+        return super().do_GET()
+
+    def _javascript(self, data: str) -> None:
+        body = data.encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/javascript; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _json(self, obj: dict[str, Any], code: int = 200) -> None:
+        body = json.dumps(obj, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def end_headers(self) -> None:
+        path = urllib.parse.urlsplit(self.path).path
+        if path == "/config.js" and not os.environ.get("CARTO_BASEMAPS_KEY"):
+            self.send_header("Cache-Control", "no-store")
+        if not path.startswith("/api/") and path != "/config.js":
+            # The SW owns immutable versioned app files; avoid stale HTML/manifest.
+            if path in ("/", "/index.html", "/sw.js", "/manifest.webmanifest"):
+                self.send_header("Cache-Control", "no-cache, must-revalidate")
+            elif path in ("/pwa.js", "/app.js", "/style.css", "/classic.css", "/classic-dark.css", "/mobile.css", "/config.js"):
+                self.send_header("Cache-Control", "no-cache")
+            else:
+                self.send_header("Cache-Control", "public, max-age=86400")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
+        super().end_headers()
+
+
+def run() -> None:
+    parser = argparse.ArgumentParser(description="Victoria Bus Radar V2.4 (web + Android PWA)")
+    parser.add_argument("--host", default="127.0.0.1", help="Bind address; use 0.0.0.0 only behind a trusted host")
+    parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", "8765")))
+    parser.add_argument("--no-browser", action="store_true")
+    args = parser.parse_args()
+    tracker = Tracker()
+    Handler.tracker = tracker
+    try:
+        server = ThreadingHTTPServer((args.host, args.port), Handler)
+        server.daemon_threads = True
+    except OSError as exc:
+        raise SystemExit(f"Cannot start server on port {args.port}: {exc}") from exc
+    threading.Thread(target=_vehicle_worker, args=(tracker,), daemon=True).start()
+    threading.Thread(target=_static_worker, args=(tracker,), daemon=True).start()
+    url = f"http://127.0.0.1:{args.port}"
+    print(f"\nVictoria Bus Radar V2.4 — serving on {args.host}:{args.port}\n"
+          f"Local URL: {url}\nPress Ctrl+C to stop.\n")
+    if not args.no_browser:
+        threading.Timer(0.6, lambda: webbrowser.open(url)).start()
+    try:
+        server.serve_forever(poll_interval=0.5)
+    except KeyboardInterrupt:
+        print("\nStopping server...")
+    finally:
+        server.server_close()
+
+
+if __name__ == "__main__":
+    run()
