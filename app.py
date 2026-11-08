@@ -427,7 +427,7 @@ def next_run(index: dict[str, Any], vehicle: dict[str, Any], now: datetime) -> d
             "trip_id": tid,
             "starts_at": f"{(first//3600)%24:02d}:{(first%3600)//60:02d}" + (" (+1d)" if first>=86400 else ""),
             "different_route": candidate.get("route_id") != current_route_id,
-            "basis": "GTFS block schedule — unconfirmed vehicle assignment"}
+            "basis": "GTFS block schedule - unconfirmed vehicle assignment"}
 
 
 
@@ -912,7 +912,7 @@ def run() -> None:
     threading.Thread(target=_trip_worker, args=(tracker,), daemon=True).start()
     threading.Thread(target=_static_worker, args=(tracker,), daemon=True).start()
     url = f"http://127.0.0.1:{args.port}"
-    print(f"\nVictoria Bus Radar V2.6 — serving on {args.host}:{args.port}\n"
+    print(f"\nVictoria Bus Radar V2.6 - serving on {args.host}:{args.port}\n"
           f"Local URL: {url}\nPress Ctrl+C to stop.\n")
     if not args.no_browser:
         threading.Timer(0.6, lambda: webbrowser.open(url)).start()
