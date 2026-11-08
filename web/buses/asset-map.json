@@ -1,0 +1,98 @@
+{
+  "source": "full-original.png",
+  "sha256": "ce6d6c818bb274127ab6707c10dd3376b32eb6d78d56af9181eb9bb4adfc05fb",
+  "method": "All illustrations preserve source RGB pixels; only the connected exterior white background of the current Vicinity drawing is made transparent.",
+  "assets": {
+    "xe40": {
+      "file": "xe40.png",
+      "source_rect": [
+        1,
+        5,
+        900,
+        257
+      ]
+    },
+    "enviro500mmc_classic": {
+      "file": "enviro500mmc_classic.png",
+      "source_rect": [
+        1005,
+        0,
+        1907,
+        286
+      ]
+    },
+    "xn40_cng": {
+      "file": "xn40_cng.png",
+      "source_rect": [
+        0,
+        304,
+        895,
+        557
+      ]
+    },
+    "enviro500mmc_green": {
+      "file": "enviro500mmc_green.png",
+      "source_rect": [
+        998,
+        322,
+        1900,
+        609
+      ]
+    },
+    "xn40_classic": {
+      "file": "xn40_classic.png",
+      "source_rect": [
+        10,
+        610,
+        908,
+        862
+      ]
+    },
+    "xn40_greenrear": {
+      "file": "xn40_greenrear.png",
+      "source_rect": [
+        973,
+        648,
+        1871,
+        901
+      ]
+    },
+    "nova2": {
+      "file": "nova2.png",
+      "source_rect": [
+        28,
+        877,
+        906,
+        1137
+      ]
+    },
+    "vicinity30": {
+      "file": "vicinity30.png",
+      "source_rect": [
+        0,
+        0,
+        402,
+        140
+      ],
+      "source": "vicinity30-user-original.png"
+    },
+    "nova3": {
+      "file": "nova3.png",
+      "source_rect": [
+        15,
+        1174,
+        918,
+        1448
+      ]
+    },
+    "enviro500": {
+      "file": "enviro500.png",
+      "source_rect": [
+        970,
+        1251,
+        1964,
+        1635
+      ]
+    }
+  }
+}

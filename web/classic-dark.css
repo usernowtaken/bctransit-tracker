@@ -1,0 +1,157 @@
+/* V2.3 — simple dark theme, same geometry as classic/light.
+   Neutral greys rather than the V2.1 neon/gradient look.
+   No extra libraries, icon packs, fonts, or image downloads. */
+html[data-theme="dark"] {
+  font-family: Arial, Helvetica, sans-serif;
+  color-scheme: dark;
+  color:#e8eaed;
+  background:#202124;
+  --bg:#202124;
+  --panel:#25272a;
+  --line:#494c52;
+  --muted:#adb0b4;
+  --accent:#8ab4f8;
+  --accent-dim:#314a6a;
+  --blue:#8ab4f8;
+  --text:#e8eaed;
+}
+html[data-theme="dark"] body {font-family:Arial,Helvetica,sans-serif}
+html[data-theme="dark"] .sidebar {
+  background:#25272a; border-right:1px solid #484a50;
+  box-shadow:none; transition:margin-left .17s ease;
+}
+html[data-theme="dark"] .brand-wrap {padding:16px 16px 14px;background:#26282b;border-bottom:1px solid #484b50}
+html[data-theme="dark"] .brand-row {gap:8px}
+html[data-theme="dark"] .brand-icon {width:34px;height:34px;background:#34363a;color:#8ab4f8;border:1px solid #51545b;border-radius:3px}
+html[data-theme="dark"] .brand-icon svg{width:23px;height:23px}
+html[data-theme="dark"] .brand-kicker {font-size:9px;color:#adb0b4;letter-spacing:.4px;font-weight:normal}
+html[data-theme="dark"] h1{font:700 19px/1.1 Arial,Helvetica,sans-serif;letter-spacing:-.6px;margin:2px 0 0}
+html[data-theme="dark"] h1>span:first-child{color:#8ab4f8}
+html[data-theme="dark"] .version{font:normal 10px Arial,Helvetica,sans-serif;border:1px solid #54565c;border-radius:2px;background:#34363a;color:#adb0b4;padding:2px 4px;letter-spacing:0}
+html[data-theme="dark"] .header-subtitle{color:#bcbfc4;margin:9px 0 0;font-size:12px}
+html[data-theme="dark"] .search-section{padding:15px 15px 14px}
+html[data-theme="dark"] .section-label{color:#d5d6d8;font-size:11px;font-weight:700;letter-spacing:0}
+html[data-theme="dark"] .key-hint{color:#adb0b4;border:1px solid #51545a;border-radius:2px;background:#2c2e32}
+html[data-theme="dark"] .search-wrap{height:37px;margin-top:8px;padding:0 9px;background:#25272a;border:1px solid #666a70;border-radius:2px;box-shadow:inset 0 1px 2px #00000013;color:#9ea2a6}
+html[data-theme="dark"] .search-wrap:focus-within{border-color:#8ab4f8;box-shadow:0 0 0 1px #8ab4f833}
+html[data-theme="dark"] .search-wrap input{font-size:13px;color:#e8eaed}
+html[data-theme="dark"] .search-wrap input::placeholder{color:#999da1}
+html[data-theme="dark"] .clear-search{color:#adb0b4}
+html[data-theme="dark"] .quick-routes{margin-top:10px;gap:5px}
+html[data-theme="dark"] .quick-chip{color:#e2e3e5;background:#2b2d30;border:1px solid #55585e;border-radius:2px;font-size:11px;padding:6px 9px;font-weight:600}
+html[data-theme="dark"] .quick-chip:hover{background:#3c3f44}
+html[data-theme="dark"] .quick-chip.active{background:#314a6a;color:#d7e6ff;border-color:#7eaeed}
+html[data-theme="dark"] .stats-row{height:64px;background:#292b2e;padding:8px 16px}
+html[data-theme="dark"] .stat-value{font-size:20px;font-weight:700;letter-spacing:0}
+html[data-theme="dark"] .stat-label{color:#9da0a4;font-size:9px;letter-spacing:.3px}
+html[data-theme="dark"] .stat-divider{height:31px;background:#484b50}
+html[data-theme="dark"] .section-heading{padding:14px 15px 3px;gap:7px}
+html[data-theme="dark"] .section-heading h2{font-size:13px;font-weight:700}
+html[data-theme="dark"] .section-count{border:1px solid #51545a;color:#bcbfc4;border-radius:2px;padding:1px 5px}
+html[data-theme="dark"] .list-hint{color:#adb0b4;margin:3px 15px 10px;font-size:11px}
+html[data-theme="dark"] .bus-list{padding:0 7px 6px;scrollbar-color:#51545a #2b2d30}
+html[data-theme="dark"] .bus-item{color:#e8eaed;border-bottom:1px solid #34363a;border-radius:0;gap:9px;margin:0;padding:9px 8px}
+html[data-theme="dark"] .bus-item:hover{background:#34383e;border-color:#484b50}
+html[data-theme="dark"] .bus-item.selected{background:#314a6a;border:1px solid #669ce1}
+html[data-theme="dark"] .bus-route{color:#e8eaed;background:#2b2d30;border:1px solid #666a70;border-left:4px solid #638cb3;min-width:40px;height:29px;border-radius:2px;font-size:12px;font-weight:700}
+html[data-theme="dark"] .bus-route.offroute{background:#493623;color:#ffd6a0;border:1px solid #b88739;border-left:4px solid #c18f42}
+html[data-theme="dark"] .bus-name{font-size:12px;font-weight:600;color:#e8eaed}
+html[data-theme="dark"] .bus-extra,html[data-theme="dark"] .bus-age{color:#adb0b4;font-size:10px}
+html[data-theme="dark"] .empty-state{color:#adb0b4;border:1px dashed #51545a;background:#26282b;border-radius:2px}
+html[data-theme="dark"] .list-more{color:#adb0b4}
+html[data-theme="dark"] .sidebar-footer{color:#9ea2a6;padding:10px 15px 13px;background:#26282b}
+html[data-theme="dark"] .sidebar-footer a{color:#9cc4ff;text-decoration:underline}
+html[data-theme="dark"] .data-led{background:#5ab88b}
+html[data-theme="dark"] .detail-section{padding:14px 15px 18px}
+html[data-theme="dark"] .back-button{color:#9ec3fd;font-weight:600;margin-bottom:15px}
+html[data-theme="dark"] .detail-eyebrow{font-size:10px;color:#adb0b4;letter-spacing:.2px;font-weight:700}
+html[data-theme="dark"] .route-tile{background:#3c5574;border:1px solid #9ea2a6;border-radius:3px;color:white;min-width:54px;height:47px;font-size:18px}
+html[data-theme="dark"] .detail-destination{color:#e2e3e5;font-size:13px;margin:13px 0}
+html[data-theme="dark"] .detail-grid{border:1px solid #484b50;border-radius:0;background:#484b50}
+html[data-theme="dark"] .detail-grid>div{background:#25272a;padding:10px 9px}
+html[data-theme="dark"] .detail-grid span{color:#adb0b4;font-size:10px}
+html[data-theme="dark"] .detail-grid strong{color:#e8eaed;font-size:12px;font-weight:600}
+html[data-theme="dark"] .detail-footnote{color:#9ea2a6}
+html[data-theme="dark"] .v2-panel{background:#26282b;border:1px solid #484b50;border-radius:2px;padding:12px;margin-top:11px}
+html[data-theme="dark"] .v2-panel .detail-eyebrow{letter-spacing:.25px;color:#bcbfc4}
+html[data-theme="dark"] .panel-status{color:#adb0b4}
+html[data-theme="dark"] .run-title{color:#e8eaed}
+html[data-theme="dark"] .stop-pair>div{background:#25272a;border:1px solid #4b4e54;border-radius:2px}
+html[data-theme="dark"] .stop-pair small{color:#adb0b4;letter-spacing:0}
+html[data-theme="dark"] .stop-dot.previous{background:#e7b85d}
+html[data-theme="dark"] .stop-dot.next{background:#8ab4f8}
+html[data-theme="dark"] .proximity-panel{border-color:#484b50}
+html[data-theme="dark"] .proximity-status{color:#e2e3e5}
+html[data-theme="dark"] .proximity-status.good{color:#85d1ac}
+html[data-theme="dark"] .proximity-status.caution{color:#ffd08a}
+html[data-theme="dark"] .proximity-status.warning{color:#ffca88}
+html[data-theme="dark"] .proximity-panel:has(.proximity-status.warning),html[data-theme="dark"] .proximity-panel:has(.proximity-status.caution){background:#433321;border-color:#866744}
+html[data-theme="dark"] .primary-button,html[data-theme="dark"] .secondary-button{padding:9px;border-radius:2px;font-size:12px;font-weight:600}
+html[data-theme="dark"] .primary-button{background:#355e94;border:1px solid #457bb6;color:white}
+html[data-theme="dark"] .primary-button.on{background:#2e5b94}
+html[data-theme="dark"] .secondary-button{background:#34363a;border:1px solid #686b72;color:#e2e3e5}
+html[data-theme="dark"] .map-main,html[data-theme="dark"] #map,html[data-theme="dark"] .leaflet-container{background:#202124}
+html[data-theme="dark"] .map-unavailable{background:#2c2e32;color:#e2e3e5;border:1px solid #51545a;border-radius:2px}
+html[data-theme="dark"] .leaflet-control-attribution{background:#292b2cdc!important;color:#adb0b4!important}
+html[data-theme="dark"] .leaflet-control-attribution a{color:#8ab4f8!important}
+html[data-theme="dark"] .leaflet-control-zoom{box-shadow:0 1px 4px #0005!important;border:1px solid #686b72!important}
+html[data-theme="dark"] .leaflet-control-zoom a{background:#25272a!important;color:#e2e3e5!important;border-bottom-color:#50535a!important}
+html[data-theme="dark"] .top-bar{top:12px;left:12px;right:12px;gap:6px}
+html[data-theme="dark"] .top-left,html[data-theme="dark"] .top-right{gap:5px}
+html[data-theme="dark"] .top-button,html[data-theme="dark"] .location-tag,html[data-theme="dark"] .status-pill,html[data-theme="dark"] .freshness{background:#292b2ecc;border:1px solid #53565c;border-radius:2px;box-shadow:0 1px 3px #0004;color:#e2e3e5;height:34px}
+html[data-theme="dark"] .top-button:hover{background:#3c3f44}
+html[data-theme="dark"] .top-button{width:34px}
+html[data-theme="dark"] .location-tag{font-size:11px;letter-spacing:0;font-weight:700;padding:0 9px}
+html[data-theme="dark"] .location-tag svg{color:#adb0b4}
+html[data-theme="dark"] .status-pill{padding:0 10px;font-size:10px;font-weight:700;letter-spacing:0}
+html[data-theme="dark"] .status-dot,html[data-theme="dark"] .status-pill.live .status-dot,html[data-theme="dark"] .status-pill.error .status-dot{box-shadow:none}
+html[data-theme="dark"] .freshness{color:#bcbfc4;font-size:11px;padding:0 8px}
+html[data-theme="dark"] .map-bottom{left:12px;bottom:11px;right:62px}
+html[data-theme="dark"] .map-help,html[data-theme="dark"] .refresh-note{background:#282b2cf0;border:1px solid #484b50;color:#bcbfc4;border-radius:2px;padding:7px 9px;letter-spacing:0}
+html[data-theme="dark"] .small-bus-icon{color:#8ab4f8}
+html[data-theme="dark"] .bus-marker.v2-marker{background:#303236!important;color:#e8eaed!important;border:1px solid #9ea2a6;border-left:4px solid var(--route-color,#638cb3);border-radius:3px;box-shadow:0 1px 3px #0004;height:27px;font-size:11px;font-weight:700;min-width:30px}
+html[data-theme="dark"] .bus-marker.v2-marker.route-colored{background:#303236;border-color:#9ea2a6;border-left-color:var(--route-color)}
+html[data-theme="dark"] .bus-marker.v2-marker.selected{background:#314a6a!important;outline:2px solid #8ab4f8;outline-offset:2px;box-shadow:0 1px 3px #0004}
+html[data-theme="dark"] .bus-marker.v2-marker.possible-offroute{background:#493623!important;border-color:#b88739;border-left-color:#c18f42;color:#ffe1b6!important}
+html[data-theme="dark"] .bus-marker.v2-marker.possible-offroute.selected{outline:2px solid #eab676}
+html[data-theme="dark"] .heading-tip{filter:none;border-bottom-color:#d5d6d8}
+html[data-theme="dark"] .bus-marker.v2-marker.possible-offroute .heading-tip{border-bottom-color:#d99c50}
+html[data-theme="dark"] .bus-dot{background:#688dbf;border:1px solid #25272a;box-shadow:0 1px 2px #0004}
+html[data-theme="dark"] .bus-cluster{background:#25272a;color:#e2e3e5;border:1px solid #75777d;border-radius:15px;box-shadow:0 1px 2px #0005;font-size:11px;font-weight:700}
+html[data-theme="dark"] .theme-toggle{width:auto}
+@media(max-width:720px){
+  html[data-theme="dark"] .sidebar{border-radius:0;border-top:1px solid #51545a;box-shadow:0 -2px 9px #0005}
+  html[data-theme="dark"] .brand-wrap{padding:10px 14px}
+  html[data-theme="dark"] .brand-icon{width:28px;height:28px}
+  html[data-theme="dark"] h1{font-size:16px}
+  html[data-theme="dark"] .search-section{padding:11px 14px}
+  html[data-theme="dark"] .stats-row{height:54px}
+  html[data-theme="dark"] .top-bar{left:8px;right:8px;top:max(8px, env(safe-area-inset-top))}
+  html[data-theme="dark"] .location-tag{padding:0 6px;font-size:9px}
+  html[data-theme="dark"] .status-pill{padding:0 6px;font-size:9px}
+  html[data-theme="dark"] .theme-toggle{width:35px;padding:0;min-width:35px}
+  .theme-toggle-label{display:none}
+}
+@media(max-width:375px){html[data-theme="dark"] .location-tag{display:none}}
+
+/* Restrained accents and edge cases from the legacy V2.1 dark CSS. */
+html[data-theme="dark"] .mobile-brand span {color:#8ab4f8}
+html[data-theme="dark"] .proximity-status.good{color:#85d1ac}
+html[data-theme="dark"] .bus-marker.v2-marker .heading-tip{filter:none}
+html[data-theme="dark"] .bus-marker.v2-marker.selected{box-shadow:0 1px 4px #0005}
+html[data-theme="dark"] .bus-marker.v2-marker.possible-offroute.selected{box-shadow:0 1px 4px #0005}
+html[data-theme="dark"] .sidebar-footer a:hover{color:#c9dcff}
+
+/* V2.5 matching flat dark treatment for stop list and advanced data. */
+html[data-theme="dark"] .advanced-panel{background:#26282b;border-color:#484b50;color:#e8eaed}
+html[data-theme="dark"] .advanced-panel summary:hover{background:#34363a}
+html[data-theme="dark"] .advanced-panel[open] .detail-grid{border-top-color:#484b50}
+html[data-theme="dark"] .all-stops-list{background:#25272a;border-color:#484b50}
+html[data-theme="dark"] .stop-list-row{border-bottom-color:#3c3f43;color:#e8eaed}
+html[data-theme="dark"] .stop-list-row:hover,html[data-theme="dark"] .stop-list-row:focus-visible{background:#333c48}
+html[data-theme="dark"] .stop-list-row.next{border-left-color:#8ab4f8}
+html[data-theme="dark"] .stop-list-row.previous{border-left-color:#e7b85d}
+html[data-theme="dark"] .stop-list-time.estimated{color:#8ab4f8}
+html[data-theme="dark"] .leaflet-popup-content-wrapper,html[data-theme="dark"] .leaflet-popup-tip{background:#292b2e;color:#e8eaed}
+html[data-theme="dark"] .stop-popup small{color:#bfc2c6}
+html[data-theme="dark"] .stop-popup span.live-arrival{color:#8ab4f8}

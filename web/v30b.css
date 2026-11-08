@@ -1,0 +1,20 @@
+/* V3.0 Beta — lightweight, opt-in GPS history interface. */
+.vehicle-history-panel{padding:10px;margin:10px 0}
+.history-options{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:9px 0 6px}
+.history-options button{min-height:36px;flex:1 1 145px;font-size:12px;padding:7px 9px}
+.history-options label{font-size:12px;flex-shrink:0}
+.history-options select{min-height:36px;max-width:115px;flex:0 0 auto}
+.history-options button[aria-pressed="true"]{background:#1769aa;color:#fff;border-color:#1769aa}
+.history-scrub{display:flex;flex-direction:column;gap:5px;margin-top:7px;padding:7px;background:rgba(120,120,120,.08);border:1px solid rgba(125,125,125,.22)}
+.history-scrub[hidden]{display:none}
+.history-scrub label{font-size:12px;font-weight:600}
+.history-scrub input{width:100%;height:27px;touch-action:pan-y;accent-color:#1667b5;cursor:pointer}
+.history-scrub span{font-size:11px}
+.history-disclaimer{font-size:10px;color:#6c7278;line-height:1.4;display:block;margin-top:7px}
+html[data-theme="dark"] .history-disclaimer{color:#b4b8bc}
+html[data-theme="dark"] .history-options button[aria-pressed="true"]{background:#295a7b;color:#fff;border-color:#7c9eb4}
+@media (max-width:720px){
+  .history-options button,.history-options select{min-height:44px}
+  .history-options button{font-size:13px}
+  .history-scrub input{height:36px}
+}

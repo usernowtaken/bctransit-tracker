@@ -1,0 +1,46 @@
+/* V3.0 Alpha: compact fleet card. Fits the classic light/dark themes. */
+.fleet-profile{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 9px;margin:0 0 11px;border:1px solid #aab1b8;border-radius:2px;background:#fff;color:#222}
+.fleet-profile-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.fleet-profile-text>strong{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
+.fleet-profile-text>span:not(.detail-eyebrow){font-size:12px;font-weight:600}
+.fleet-profile-text>.fleet-confidence{font-size:10px;font-weight:700;color:#88620b}
+.fleet-profile-text>small{font-size:10px;line-height:1.35;color:#74777a;overflow-wrap:anywhere}
+.fleet-profile img{width:min(47%, 166px);height:auto;max-height:95px;object-fit:contain;flex-shrink:0;display:block}
+html[data-theme="dark"] .fleet-profile{background:#292b2e;border-color:#585d61;color:#e8eaed}
+html[data-theme="dark"] .fleet-profile-text>.fleet-confidence{font-size:10px;font-weight:700;color:#88620b}
+.fleet-profile-text>small{color:#aeb3b7}
+#modelSelect{max-width:100%}
+@media (max-width:720px){.fleet-profile{min-height:92px;padding:12px 9px;gap:5px}.fleet-profile img{width:min(47%,150px)}.fleet-profile-text>strong{font-size:16px}}
+@media (max-width:360px){.fleet-profile img{width:42%}.fleet-profile-text>strong{font-size:15px}.fleet-profile-text>.fleet-confidence{font-size:10px;font-weight:700;color:#88620b}
+.fleet-profile-text>small{font-size:9px}}
+
+.fleet-gallery-link{margin:2px 0 5px;font-size:12px}
+
+/* V3.0 stable artwork: user's exact PNG drawings, not previous SVG renderings. */
+.fleet-art{width:min(47%,180px);flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
+.fleet-profile .fleet-art img{width:100%;height:auto;max-height:99px;object-fit:contain;display:block;image-rendering:auto}
+.fleet-profile .fleet-art img[hidden],.artwork-picker[hidden]{display:none}
+.artwork-picker{display:block;width:100%;font:10px Arial,sans-serif;color:#54595c;line-height:1.3}
+.artwork-picker select{display:block;width:100%;margin-top:3px;min-height:33px;font-size:11px;border:1px solid #aaa;background:#fff;color:#222;border-radius:2px}
+html[data-theme="dark"] .artwork-picker{color:#c1c6cc}
+html[data-theme="dark"] .artwork-picker select{color:#eee;background:#34383c;border-color:#61666c}
+@media(max-width:720px){.fleet-art{width:min(45%,160px)}.artwork-picker select{min-height:44px}}
+@media(max-width:360px){.fleet-art{width:42%}}
+
+.fleet-profile .fleet-art[hidden]{display:none}
+
+/* Optional 2009 NovaBus rear-body correction, kept out of the main profile. */
+.nova-roof-panel[hidden]{display:none!important}
+.nova-roof-panel label{display:block;font-size:12px;margin:8px 0 0}
+.nova-roof-panel select{display:block;width:100%;min-height:36px;margin-top:5px;border:1px solid #aaa;background:#fff;color:#222;font:12px Arial,sans-serif}
+html[data-theme='dark'] .nova-roof-panel select{background:#303339;color:#eee;border-color:#777}
+@media(max-width:720px){.nova-roof-panel select{min-height:44px}}
+
+/* NovaBus V3.0.4 fleet-by-fleet appearance refinements. No bus artwork changes. */
+.fleet-profile .fleet-profile-text>span.nova-body-note{font:normal 11px/1.4 Arial,sans-serif;display:block;margin-top:5px;font:11px/1.4 Arial,sans-serif;color:var(--muted,#64748b)}
+.nova-body-note[hidden],.nova-smart-highlight[hidden]{display:none!important}
+.nova-smart-highlight{padding:11px 12px;border:1px solid #65864e;border-left:4px solid #65a342;border-radius:3px;margin:9px 0;background:rgba(98,155,68,.09);color:inherit;display:flex;flex-direction:column;gap:5px}
+.nova-smart-highlight strong{font:700 12px/1.35 Arial,sans-serif;letter-spacing:.03em}
+.nova-smart-highlight span{font:12px/1.4 Arial,sans-serif}
+.fleet-profile.smart-prototype{border-left:4px solid #72a84b}
+@media(max-width:720px){.nova-smart-highlight{margin:10px 0;padding:12px}}

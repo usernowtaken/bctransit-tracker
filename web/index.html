@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en" data-theme="classic">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#f7f7f7" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Bus Radar" />
+  <meta name="application-name" content="BC Transit Bus Radar" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <meta name="description" content="An independent, lightweight live bus tracker for the multiple British Columbia transit systems, using BC Transit public data." />
+  <title>BC Transit Bus Radar — Live Tracker</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="preconnect" href="https://unpkg.com" crossorigin />
+  <link rel="preconnect" href="https://a.basemaps.cartocdn.com" crossorigin />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="/style.css?v=3.0" />
+  <link rel="stylesheet" href="/classic.css?v=3.0" />
+  <link rel="stylesheet" href="/classic-dark.css?v=3.0" />
+  <link rel="stylesheet" href="/mobile.css?v=3.0" />
+  <link rel="stylesheet" href="/v27.css?v=3.0" />
+  <link rel="stylesheet" href="/v28.css?v=3.0" />
+  <link rel="stylesheet" href="/v30.css?v=3.0.5" />
+  <link rel="stylesheet" href="/v30b.css?v=3.0" />
+  <link rel="stylesheet" href="/v30rc.css?v=3.0" />
+  <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script defer src="/config.js"></script>
+  <script defer src="/app.js?v=3.2.0"></script>
+  <script defer src="/pwa.js?v=3.2.0"></script>
+  <link rel="stylesheet" href="/v307.css?v=3.0.7" />
+  <link rel="stylesheet" href="/v31.css?v=3.1.0" />
+  <link rel="stylesheet" href="/v32.css?v=3.2.0" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="Bus tracker controls">
+      <button id="sheetHandle" class="mobile-sheet-handle" type="button" aria-label="Expand bus panel" aria-expanded="false"><span class="sheet-grip" aria-hidden="true"></span><span class="sheet-hint">Swipe up for more · down for map</span></button>
+      <div class="brand-wrap">
+        <div class="brand-row">
+          <div class="brand-icon" aria-hidden="true">
+            <svg viewBox="0 0 32 32" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M7 21V8c0-3 3-4 9-4s9 1 9 4v13l-3 3H10z" />
+              <path d="M8 15h16M11 24v4m10-4v4" /><circle cx="11" cy="19" r="1" fill="currentColor"/><circle cx="21" cy="19" r="1" fill="currentColor"/><path d="M13 9h6" />
+            </svg>
+          </div>
+          <div class="brand-text"><span class="brand-kicker"><span id="regionName">GREATER VICTORIA</span></span><h1>BUS<span>RADAR</span><span class="version">V3.2</span></h1></div>
+          <button id="sidebarClose" class="icon-button sidebar-close" aria-label="Hide sidebar" title="Hide sidebar">✕</button>
+        </div>
+      </div>
+
+      <section class="search-section" aria-label="Find buses by route">
+        <label class="section-label" for="routeSearch">FIND A ROUTE OR BUS <span class="key-hint">/</span></label>
+        <div class="search-wrap">
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg>
+          <input id="routeSearch" type="search" placeholder="Route, fleet #, or model" spellcheck="false" autocomplete="off" />
+          <button id="clearSearch" class="clear-search" aria-label="Clear route filter" title="Show all routes" hidden>✕</button>
+        </div>
+        <div class="quick-routes" id="quickRoutes" aria-label="Quick route filters">
+          <button class="quick-chip active" data-route="">All routes</button>
+        </div>
+      </section>
+
+      <details class="favorites-section collapsible-side" id="favoritesSection" aria-label="Saved favourites" open hidden>
+        <summary class="section-heading favorites-heading"><h2>★ Favourites</h2></summary>
+        <div id="favoritesList" class="favorites-list"></div>
+      </details>
+      <details class="v31-alerts collapsible-side" id="alertsMainSection">
+        <summary class="section-heading"><h2>⚠ Service alerts</h2></summary>
+        <p id="alertsMainIntro" class="panel-status">Service alerts load only when this panel is opened.</p>
+        <div id="alertsMainContent" class="v31-alert-list"></div>
+      </details>
+      <section id="sharedVehicleNotice" class="v31-shared-vehicle" aria-live="polite" hidden></section>
+      <details class="nearby-section collapsible-side" id="nearbySection" aria-label="Nearby buses and stops" open hidden>
+        <summary class="section-heading nearby-heading"><h2>Near me</h2></summary>
+        <button id="locationStop" type="button" class="mini-button nearby-hide" title="Stop using location">Hide location ✕</button>
+        <p class="list-hint" id="nearbyHint">Location is only used inside your browser.</p>
+        <div id="nearbyResults" class="nearby-results"></div>
+      </details>
+      <section class="stats-row" aria-label="Tracking statistics">
+        <div><span class="stat-value" id="busCount">—</span><span class="stat-label">REPORTED BUSES</span></div>
+        <div class="stat-divider"></div>
+        <div><span class="stat-value" id="routeCount">—</span><span class="stat-label">ACTIVE ROUTES</span></div>
+      </section>
+
+      <section class="fleet-section" aria-label="Active buses">
+        <div class="section-heading"><h2 id="listHeading">Active buses</h2><span class="section-count" id="resultCount">—</span></div>
+        <details class="list-filter-details"><summary>Group, sort &amp; filter</summary>
+          <div class="list-toolbar list-toolbar-v28">
+          <label for="groupMode">Group</label><select id="groupMode" aria-label="Group active buses"><option value="route">By route</option><option value="direction">Route + direction</option><option value="none">Individual buses</option></select>
+          <label for="sortSelect">Sort</label><select id="sortSelect" aria-label="Sort buses"><option value="route">Route</option><option value="recent">Newest GPS</option><option value="nearest">Nearest to me</option></select>
+          <label for="serviceFilter">Show</label><select id="serviceFilter" aria-label="Filter bus status"><option value="all">All statuses</option><option value="near">Near route</option><option value="off">Possibly off-route</option><option value="stale">Stale GPS</option><option value="unknown">Unknown route/status</option></select>
+          <button id="expandAll" type="button" class="mini-button">Expand all</button><button id="collapseAll" type="button" class="mini-button">Collapse all</button>
+          </div>
+        </details>
+        <p class="list-hint" id="listHint">Loading current vehicle positions…</p>
+        <div class="bus-list" id="busList" role="list"></div>
+        <div class="list-more" id="listMore" hidden></div>
+      </section>
+
+      <details class="preferences-section" id="preferencesSection">
+        <summary>⚙ Display preferences</summary>
+        <div class="preferences-body">
+          <label for="modelSelect">Vehicle model</label><select id="modelSelect" aria-label="Filter active buses by vehicle model">
+            <option value="all">All models</option>
+            <option value="vicinity30">Vicinity 30′</option>
+            <option value="nova_gen2">NovaBus LFS Gen 2</option>
+            <option value="nova_gen3">NovaBus LFS Gen 3</option>
+            <option value="nova_gen4">NovaBus LFS Gen 4</option>
+            <option value="xn40">New Flyer XN40</option>
+            <option value="xe40">New Flyer XE40</option>
+            <option value="enviro500">Enviro500</option>
+            <option value="enviro500mmc">Enviro500 MMC</option>
+            <option value="generic">Other / unknown</option>
+          </select>
+          <p class="fleet-gallery-link"><a href="/fleet-gallery.html" target="_blank" rel="noopener noreferrer">View all 10 supplied bus drawings</a></p>
+          <label for="densitySelect">Sidebar spacing</label><select id="densitySelect"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select>
+          <label for="markerSizeSelect">Bus label size</label><select id="markerSizeSelect"><option value="small">Small</option><option value="normal">Normal</option><option value="large">Large</option></select>
+          <label class="preferences-checkbox"><input id="routeColorsToggle" type="checkbox" checked /> Use route colours</label>
+          <label class="preferences-checkbox"><input id="lowBandwidthToggle" type="checkbox" /> Data saver: fewer browser checks</label>
+          <div class="system-health"><div class="system-health-header"><strong>Feed status by region</strong><button id="checkSystemHealth" type="button" class="mini-button">Check</button></div><div id="systemHealthList">Check to see data freshness for all three systems.</div></div>
+          <p>Saved on this device · Lite map is still available at the top.</p>
+        </div>
+      </details>
+      <section class="detail-section" id="detailSection" hidden aria-label="Selected bus details">
+        <button id="detailBack" class="back-button">← Back to buses</button>
+        <div class="detail-identity"><span class="route-tile" id="detailRoute">—</span><div><div class="detail-eyebrow">SELECTED VEHICLE</div><h2 id="detailTitle">Route unknown</h2></div></div>
+        <div class="detail-destination" id="detailDestination">Destination unavailable</div>
+        <div class="fleet-profile" id="fleetProfile" aria-label="Vehicle fleet identification">
+          <div class="fleet-profile-text">
+            <span class="detail-eyebrow">FLEET IDENTIFICATION · V3.0</span>
+            <strong id="detailFleet">Fleet number unavailable</strong>
+            <span class="fleet-confidence" id="detailFleetConfidence">Not identified</span>
+            <span id="detailModel">Model unknown</span>
+            <span id="detailNovaBody" class="nova-body-note" hidden></span>
+          </div>
+          <div class="fleet-art" id="fleetArt" hidden>
+            <img id="detailBusImage" alt="Bus model drawing" width="192" height="90" decoding="async" loading="lazy" hidden />
+            <label id="artworkPicker" class="artwork-picker" for="detailArtworkVariant" hidden>Drawing variant
+              <select id="detailArtworkVariant" aria-label="Choose bus model drawing variant"></select>
+            </label>
+          </div>
+        </div>
+        <div class="nova-smart-highlight" id="novaSmartSpecial" hidden>
+          <strong>★ FLEET #9434 — SMART LFS PROTOTYPE</strong>
+          <span>A special 2012 NovaBus LFS in the Victoria fleet, documented with full-length roof fairings. Vehicle model confirmed by published fleet photographs; the profile uses a NovaBus reference illustration.</span>
+        </div>
+        <div class="v31-profile-actions">
+          <button id="favoriteBusButton" class="secondary-button" type="button">☆ Save this bus</button>
+          <button id="shareVehicleButton" class="secondary-button" type="button">Share bus</button>
+        </div>
+        <p id="shareVehicleStatus" class="panel-status" role="status" hidden></p>
+        <button id="favoriteRouteButton" class="secondary-button favorite-route-button" type="button">☆ Save this route</button>
+        <button id="followButton" class="primary-button">Follow vehicle: OFF</button>
+        <button id="recenterButton" class="secondary-button">Center on this bus</button>
+        <div class="detail-grid compact-detail-grid" aria-label="Current vehicle information">
+          <div><span>Feed vehicle ID</span><strong id="detailId">—</strong></div>
+          <div><span>GPS updated</span><strong id="detailAge">—</strong></div>
+          <div><span>Speed</span><strong id="detailSpeed">—</strong></div>
+          <div><span>Bearing</span><strong id="detailBearing">—</strong></div>
+        </div>
+
+
+        <details class="v2-panel collapsible-detail route-stops-panel" open><summary>ROUTE LINE &amp; STOPS</summary><p class="panel-status" id="detailOverlayStatus">Select a vehicle to load its route</p>
+          <div class="stop-pair"><div><span class="stop-dot previous"></span><small>PREVIOUS / CURRENT STOP</small><strong id="detailPreviousStop">Unknown</strong></div>
+          <div><span class="stop-dot next"></span><small>NEXT STOP</small><strong id="detailNextStop">Unknown</strong></div></div>
+          <div class="panel-status" id="detailStopBasis">No stop data</div>
+          <div class="all-stops-header">ALL STOPS <span>Tap any stop for arrival information</span></div>
+          <div class="all-stops-list" id="allStopsList"><div class="stop-list-empty">Loading stops…</div></div>
+          <div class="panel-status" id="arrivalFeedStatus">Real-time arrivals will appear when published; otherwise times are scheduled.</div>
+        </details>
+        <details id="alertsDetailSection" class="v2-panel collapsible-detail v31-detail-alerts"><summary>SERVICE ALERTS FOR THIS VEHICLE</summary>
+          <div id="alertsDetailContent" class="v31-alert-list"><p class="panel-status">Expand to check for relevant alerts.</p></div>
+        </details>
+        <details class="v2-panel collapsible-detail route-change-panel"><summary>NEXT SCHEDULED TRIP</summary>
+          <strong class="run-title" id="detailRouteChange">Not determinable</strong>
+          <p class="panel-status" id="detailRouteChangeNote">Needs a live trip and published GTFS block schedule.</p>
+        </details>
+        <details class="v2-panel collapsible-detail proximity-panel"><summary>GPS / SCHEDULED ROUTE CHECK</summary>
+          <strong class="proximity-status" id="detailProximityStatus">Cannot determine</strong>
+          <p class="panel-status" id="detailProximityNote">Compares GPS with the published route shape; off-route does not confirm a bus is NIS.</p>
+        </details>
+        <details class="v2-panel collapsible-detail vehicle-history-panel" aria-label="Recorded GPS history"><summary>RECORDED GPS HISTORY</summary>
+          <div class="history-options">
+            <button id="historyToggle" class="secondary-button" type="button" aria-pressed="false">Show movement trail</button>
+            <label for="historyWindow">Past</label>
+            <select id="historyWindow" aria-label="Movement trail duration">
+              <option value="15">15 min</option><option value="30" selected>30 min</option><option value="60">60 min</option>
+            </select>
+          </div>
+          <p id="historyStatus" class="panel-status" role="status">GPS points are recorded by the server. Tap Show movement trail to load this bus's history.</p>
+          <div id="historyScrubArea" class="history-scrub" hidden>
+            <label for="historyScrub">Inspect recorded position</label>
+            <input id="historyScrub" type="range" min="0" max="1" value="1" step="1" aria-label="Inspect a recorded GPS position" />
+            <span id="historyScrubLabel" class="panel-status">—</span>
+          </div>
+          <small class="history-disclaimer">Recorded GPS fixes are connected by straight lines, not snapped to roads. Gaps and jumps are not joined. Server recording starts only after this version is running.</small>
+        </details>
+        <details class="v2-panel collapsible-detail activity-panel" aria-label="Recorded vehicle activity"><summary>VEHICLE ACTIVITY TIMELINE</summary>
+          <div class="activity-controls">
+            <button id="activityToggle" class="secondary-button" type="button" aria-pressed="false">Show activity timeline</button>
+            <label for="activityWindow">Past</label>
+            <select id="activityWindow" aria-label="Activity timeline duration">
+              <option value="60">1 hour</option><option value="180" selected>3 hours</option>
+              <option value="720">12 hours</option><option value="1440">24 hours</option>
+            </select>
+          </div>
+          <div id="activityDaySummary" class="v31-activity-day" hidden></div>
+          <div class="activity-meta"><span id="activitySummary">No timeline loaded.</span><button id="activityRefresh" type="button" class="mini-button" hidden>Refresh</button></div>
+          <p id="activityStatus" class="panel-status" role="status">Load a timeline to view observed routes and possible off-route travel.</p>
+          <div id="activityEvents" class="activity-events" hidden></div>
+          <small class="history-disclaimer">Based only on GPS fixes recorded by this server. Reported routes may be stale; off-route does not confirm NIS. Gaps are not filled in.</small>
+        </details>
+        <details class="advanced-panel" id="advancedVehicleData"><summary>Advanced vehicle data</summary>
+          <small id="detailFleetBasis" class="fleet-source-note">Fleet ID and model information source.</small>
+          <div class="detail-grid">
+            <div><span>Latitude</span><strong id="detailLat">—</strong></div>
+            <div><span>Longitude</span><strong id="detailLon">—</strong></div>
+            <div><span>Trip ID</span><strong id="detailTrip">—</strong></div>
+            <div><span>Vehicle block</span><strong id="detailBlock">—</strong></div>
+            <div><span>Occupancy</span><strong id="detailOccupancy">—</strong></div>
+            <div><span>Stop status</span><strong id="detailStopStatus">—</strong></div>
+            <div><span>Feed route ID</span><strong id="detailRouteId">—</strong></div>
+            <div><span>Feed label</span><strong id="detailFeedLabel">—</strong></div>
+          </div>
+        </details>
+        <p class="detail-footnote">Off-route and upcoming trip status are estimates, not confirmed service assignments. Fleet-source details and original labels are available under Advanced vehicle data.</p>
+      </section>
+
+      <footer class="sidebar-footer">
+        <div class="data-notice"><span class="data-led"></span><span>DATA: <a href="https://www.bctransit.com/open-data/" target="_blank" rel="noopener noreferrer">BC Transit Open Data</a></span></div>
+        <div>Independent project · Not affiliated with BC Transit</div>
+      </footer>
+    </aside>
+
+    <main class="map-main" aria-label="BC Transit live bus map">
+      <div id="map" aria-label="Interactive map of BC Transit buses"></div>
+      <div id="mapUnavailable" class="map-unavailable" hidden>Map library unavailable. Check your internet connection and reload the page.</div>
+
+      <div class="top-bar">
+        <div class="top-left">
+          <button class="top-button menu-toggle" id="menuToggle" aria-label="Toggle sidebar" title="Toggle sidebar">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          </button>
+          <label class="system-select-wrap" for="systemSelect"><span class="visually-hidden">Transit system</span><select id="systemSelect" class="system-select" aria-label="Transit system">
+            <option value="victoria">Greater Victoria</option>
+            <option value="chilliwack">Chilliwack / FVX</option>
+            <option value="kelowna">Kelowna</option>
+          </select></label>
+        </div>
+        <div class="top-right">
+          <button id="liteToggle" class="top-button lite-toggle" type="button" aria-label="Toggle lightweight map mode" title="Toggle lightweight map mode" aria-pressed="false">Lite</button>
+          <div class="status-pill" id="statusPill" role="status"><span class="status-dot"></span><span id="statusText">CONNECTING</span></div>
+          <span class="freshness" id="freshness">Awaiting positions</span>
+          <button id="installButton" class="top-button install-button" type="button" hidden title="Install BC Transit Bus Radar" aria-label="Install app to home screen">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2v12m-4-4 4 4 4-4M5 17v4h14v-4"/></svg>
+          </button>
+          <button id="themeToggle" class="top-button theme-toggle" type="button" title="Switch to dark map" aria-label="Switch to dark map" aria-pressed="true">
+            <span class="theme-toggle-symbol" aria-hidden="true">☀</span><span class="theme-toggle-label">Light map</span>
+          </button>
+          <button id="resetView" class="top-button reset-view" title="Reset view" aria-label="Reset map view">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M1 12h4m14 0h4"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <details class="v32-board" id="nearbyBoard" aria-label="Nearby stop departures">
+        <summary class="v32-board-toggle">◷ Nearby departures</summary>
+        <div class="v32-board-body">
+          <div class="v32-board-heading"><strong>Departures and nearby buses</strong><button id="boardRefresh" type="button" title="Refresh departures" aria-label="Refresh nearby departures">↻</button></div>
+          <p class="v32-board-hint" id="boardHint">Open to find departures around the map centre.</p>
+          <div class="v32-board-results" id="boardResults" aria-live="polite"></div>
+          <small class="v32-board-note">Live = fresh predicted time · Sched = published timetable. Closest bus stops are based on distance, not confirmed route service.</small>
+        </div>
+      </details>
+      <button id="locateButton" class="locate-button" type="button" title="Show my location and nearby buses" aria-label="Show my location and nearby buses" aria-pressed="false">◎ <span>Near me</span></button>
+      <button id="mobileOpen" class="mobile-open" type="button" aria-label="Show bus routes and search">☰ <span id="mobileOpenText">Routes</span></button>
+      <div class="map-bottom">
+        <div class="map-help"><span class="small-bus-icon">▰</span> Click a bus to view route and vehicle details</div>
+        <span class="refresh-note" id="refreshNote">Live source: ~15s · Local check: 5s</span>
+      </div>
+      <div class="mobile-brand">BUS<span>RADAR</span></div>
+    </main>
+  </div>
+  <dialog id="locationConsent" class="location-consent" aria-labelledby="locationConsentTitle">
+    <h2 id="locationConsentTitle">Show your location?</h2>
+    <p>Bus Radar will ask your browser for location access. Your precise position stays in this browser and is used to find nearby buses and stops. It is not sent to the Bus Radar server.</p>
+    <p>You can hide your location at any time. Your browser may also offer its own permission controls.</p>
+    <div class="consent-actions"><button id="locationCancel" type="button">Not now</button><button id="locationAgree" type="button">Allow location request</button></div>
+  </dialog>
+</body>
+</html>

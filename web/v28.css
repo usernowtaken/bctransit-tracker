@@ -1,0 +1,78 @@
+/* BC Transit Bus Radar V2.8 — compact, classic-map controls, no external assets. */
+.list-toolbar-v28{display:grid!important;grid-template-columns:38px minmax(0,1fr) 32px minmax(0,1fr);align-items:center;gap:6px;padding:7px 11px 9px!important;border-bottom:1px solid var(--line)}
+.list-toolbar-v28 label{color:var(--muted);font:11px Arial,sans-serif}
+.list-toolbar-v28 select{min-width:0!important;width:100%;font-size:11px;min-height:33px}
+.list-toolbar-v28 label[for="serviceFilter"]{grid-column:1}
+.list-toolbar-v28 #serviceFilter{grid-column:2/5}
+.list-toolbar-v28 .mini-button{min-height:30px}
+.list-toolbar-v28 #expandAll{grid-column:1/3}
+.list-toolbar-v28 #collapseAll{grid-column:3/5}
+.mini-button{font:11px Arial,sans-serif;color:var(--text);border:1px solid var(--line);background:var(--panel);border-radius:2px;padding:5px 8px;cursor:pointer}
+.mini-button:hover{background:var(--accent-dim)}
+.route-group-header-row{display:flex;align-items:stretch;background:var(--panel);border-bottom:1px solid var(--line)}
+.route-group-header-row .route-group-heading{flex:1;min-width:0;border-bottom:0}
+.group-fav-star,.stop-star{flex:none;display:grid;place-items:center;min-width:36px;min-height:36px;border:0;border-left:1px solid var(--line);background:transparent;color:#b0801d;font:22px Arial,sans-serif;cursor:pointer}
+.group-fav-star:hover,.stop-star:hover{background:var(--accent-dim)}
+.stop-list-entry{display:flex;align-items:stretch;gap:0;border-bottom:1px solid var(--line)}
+.stop-list-entry .stop-list-row{flex:1;min-width:0;border-bottom:0!important}
+.stop-list-entry .stop-star{min-width:40px}
+.favorites-section,.nearby-section{border-bottom:1px solid var(--line);padding:5px 12px 10px;flex:none}
+.favorites-section .section-heading,.nearby-section .section-heading{padding:6px 0!important;display:flex;align-items:center;justify-content:space-between}
+.favorites-list{display:flex;flex-wrap:wrap;gap:5px}
+.favorite-chip{border:1px solid var(--line);color:var(--text);background:var(--panel);border-radius:3px;padding:5px 7px;font:12px Arial,sans-serif;cursor:pointer;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.favorite-chip:hover{background:var(--accent-dim)}
+.favorite-chip.stop-favorite{font-size:11px}
+.nearby-section{max-height:265px;overflow:auto;overscroll-behavior:contain}
+.nearby-results{display:flex;flex-direction:column;gap:3px}
+.nearby-results h3{margin:7px 0 3px;font:700 11px Arial,sans-serif;color:var(--muted);text-transform:uppercase}
+.nearby-results p{margin:4px 0;font-size:11px;color:var(--muted)}
+.nearby-item{flex:1;min-width:0;text-align:left;color:var(--text);border:1px solid var(--line);background:var(--panel);border-radius:2px;font:12px/1.3 Arial,sans-serif;padding:6px 8px;cursor:pointer;overflow:hidden;text-overflow:ellipsis}
+.nearby-item:hover{background:var(--accent-dim)}
+.nearby-stop-row{display:flex;align-items:stretch;gap:2px;min-width:0}
+.nearby-stop-row .stop-star{min-width:39px;border:1px solid var(--line);font-size:19px}
+.nearby-heading .mini-button{font-size:10px}
+.favorite-route-button{display:block;width:100%;margin:9px 0 0;font-size:12px}
+.locate-button{position:absolute;z-index:800;right:12px;bottom:104px;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--panel);border:1px solid #999;color:var(--text);font:bold 12px Arial,sans-serif;border-radius:3px;padding:7px 11px;cursor:pointer;box-shadow:0 1px 4px #0003;min-height:39px}
+.locate-button.active{color:#1261b8;border-color:#2674c2;background:var(--accent-dim)}
+.location-consent{border:1px solid #aaa;border-radius:5px;box-shadow:0 8px 25px #0006;background:var(--panel);color:var(--text);max-width:min(400px,calc(100vw - 30px));padding:20px;font:13px/1.5 Arial,sans-serif}
+.location-consent::backdrop{background:#0007}
+.location-consent h2{font-size:17px;margin:0 0 10px}
+.location-consent p{margin:0 0 9px}
+.consent-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:19px;flex-wrap:wrap}
+.consent-actions button{min-height:42px;border:1px solid #999;border-radius:3px;padding:8px 12px;font:700 12px Arial,sans-serif;cursor:pointer;background:var(--panel);color:var(--text)}
+.consent-actions button:last-child{background:#1a73e8;border-color:#1a73e8;color:white}
+.arrival-row{margin:5px 0;border-bottom:1px solid #ddd;padding-bottom:5px;font:12px Arial,sans-serif}
+html[data-theme="dark"] .location-consent{border-color:#64686b}
+html[data-theme="dark"] .locate-button{border-color:#666}
+html[data-theme="dark"] .locate-button.active{color:#b7d6ff;background:#27405d}
+@media(max-width:720px){
+  .list-toolbar-v28{grid-template-columns:45px minmax(0,1fr) 34px minmax(0,1fr);gap:7px!important}
+  .list-toolbar-v28 select{min-height:45px;font-size:13px}
+  .list-toolbar-v28 .mini-button{min-height:44px;font-size:13px}
+  .group-fav-star{min-width:47px;min-height:48px;font-size:24px}
+  .favorites-section,.nearby-section{padding:7px 12px 12px}
+  .favorite-chip{min-height:44px;padding:10px 12px;font-size:14px}
+  .nearby-section{max-height:35dvh}
+  .nearby-item{min-height:45px;font-size:13px;padding:10px}
+  .nearby-stop-row .stop-star{min-width:46px;font-size:23px}
+  .locate-button{bottom:max(82px, env(safe-area-inset-bottom, 0px) + 74px);right:10px;min-height:46px;padding:8px 13px;font-size:13px}
+  body:not(.sidebar-hidden) .locate-button{display:none}
+  .location-consent{font-size:14px;padding:18px}
+  .location-consent .consent-actions button{min-height:48px;font-size:13px}
+  .stop-list-entry .stop-star{min-width:46px}
+}
+@media(max-width:360px){
+  .locate-button{right:9px;bottom:144px}
+  .list-toolbar-v28{grid-template-columns:33px minmax(0,1fr) 28px minmax(0,1fr);gap:5px!important}
+  .list-toolbar-v28 label{font-size:10px}
+}
+
+.system-health{grid-column:1/-1;border-top:1px solid var(--line);padding-top:8px;font-size:11px}
+.system-health-header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.system-health-list{display:grid;gap:4px}
+.health-item{display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)}
+.health-label{font-weight:700;color:var(--text)}
+.health-state{font-weight:700;color:var(--muted)}
+.health-state.good{color:#267447}
+.health-state.stale{color:#b06f10}
+@media(max-width:720px){.system-health-header .mini-button{min-height:42px}}

@@ -1,0 +1,36 @@
+/* V3.1: low-friction transit alerts, favourite fleet units, day summary and sharing. */
+.sidebar>.v31-alerts{order:4}
+.sidebar>.v31-shared-vehicle{order:2}
+.sidebar>.nearby-section{order:5}
+.sidebar>.fleet-section{order:6}
+.sidebar>.preferences-section{order:7}
+.sidebar>.detail-section{order:8}
+.sidebar>.sidebar-footer{order:9}
+.v31-alerts{border-bottom:1px solid var(--line);padding:0 10px 8px}
+.v31-alerts>summary{min-height:42px;display:list-item;cursor:pointer;padding:10px 4px}
+.v31-alerts>summary h2{display:inline;margin:0;font-size:13px}
+.v31-alert-list{display:grid;gap:8px;padding:6px 0 8px}
+.v31-alert-item{background:var(--panel);border:1px solid var(--line);padding:9px;border-radius:3px}
+.v31-alert-item strong{display:block;font-size:12px;line-height:1.4}
+.v31-alert-item small{display:block;color:var(--muted);margin-top:4px;line-height:1.45;white-space:pre-line;overflow-wrap:anywhere}
+.v31-alert-item a{display:inline-block;margin-top:6px;font-size:12px}
+.v31-alert-tag{font-size:10px;font-weight:700;color:var(--text);background:var(--bg);padding:2px 5px;border-radius:3px}
+.v31-profile-actions{display:flex;gap:7px;margin-top:10px}
+.v31-profile-actions button{flex:1;min-width:0;min-height:41px}
+.v31-detail-alerts .v31-alert-list{margin:8px 10px!important}
+.v31-favorite-vehicle{display:flex;align-items:center;gap:7px;margin:4px 0}
+.v31-favorite-vehicle .v31-favorite-open{flex:1;text-align:left;min-height:38px}
+.v31-favorite-remove{min-width:38px;min-height:38px;border:1px solid var(--line);background:transparent;color:var(--text);cursor:pointer}
+.v31-shared-vehicle{padding:10px;border-bottom:1px solid var(--line);font-size:12px}
+.v31-shared-vehicle strong{display:block;margin-bottom:7px}
+.v31-shared-vehicle p{line-height:1.5;margin:3px 0 8px}
+.v31-shared-vehicle button{min-height:40px}
+.v31-activity-day{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 10px}
+.v31-activity-stat{border:1px solid var(--line);padding:7px;min-width:0}
+.v31-activity-stat small{display:block;color:var(--muted);font-size:10px;margin-bottom:2px}
+.v31-activity-stat strong{display:block;overflow-wrap:anywhere;font-size:12px}
+.v31-activity-stat-wide{grid-column:1/-1}
+@media(max-width:720px){.v31-profile-actions button{min-height:46px}.v31-favorite-remove{min-width:44px;min-height:44px}.v31-alerts>summary{min-height:46px}}
+
+.v31-alerts[hidden]{display:none!important}
+.v31-shared-vehicle[hidden]{display:none!important}
