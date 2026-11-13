@@ -1,0 +1,103 @@
+/* V3.4 — lightweight motion, theme accents, map-centre reference and settings. */
+:root{--v34-accent:#1a73e8;--v34-accent-soft:#1a73e819;--v34-motion:.16s;--v34-ui-scale:1}
+html[data-theme="dark"]{--v34-accent:#59ddb7;--v34-accent-soft:#59ddb71c}
+/* Accent is deliberately separate from route colours and service-alert status. */
+html[data-v34-accent] .brand-icon,html[data-v34-accent] .mobile-brand span,
+html[data-v34-accent] .brand-text h1>span:first-child{color:var(--v34-accent)!important}
+html[data-v34-accent] .search-wrap:focus-within,
+html[data-v34-accent] :is(input,button,select,summary):focus-visible{outline-color:var(--v34-accent)!important}
+html[data-v34-accent] .quick-chip.active,
+html[data-v34-accent] .v33-dir-choice.active{border-color:var(--v34-accent)!important;background:var(--v34-accent-soft)!important}
+html[data-v34-accent] .v33-dir-choice.active{color:var(--text)!important}
+html[data-v34-accent] .primary-button,html[data-v34-accent] .v34-settings-foot #v34DoneSettings{
+  background:var(--v34-accent);border-color:var(--v34-accent);color:#fff}
+html[data-v34-accent] .bus-item.selected{border-left:3px solid var(--v34-accent)!important}
+html[data-v34-accent] .top-button.v34-settings-open:hover{border-color:var(--v34-accent)}
+/* Center marker is pinned to the visible map viewport, never captures clicks. */
+.v34-map-centre{position:absolute;left:50%;top:50%;width:28px;height:28px;transform:translate(-50%,-50%);z-index:450;pointer-events:none;display:grid;place-items:center;opacity:.82;filter:drop-shadow(0 0 2px #fff) drop-shadow(0 1px 1px #0008)}
+.v34-centre-dot{position:relative;display:block;width:8px;height:8px;border-radius:50%;background:var(--v34-accent);border:2px solid #fff;box-shadow:0 0 0 1px #263b49aa}
+html[data-v34-crosshair="strong"] .v34-map-centre{width:34px;height:34px}
+html[data-v34-crosshair="strong"] .v34-centre-dot{width:10px;height:10px}
+html[data-v34-crosshair="strong"] .v34-map-centre:before,
+html[data-v34-crosshair="strong"] .v34-map-centre:after{content:"";position:absolute;left:50%;top:50%;background:var(--v34-accent);transform:translate(-50%,-50%);z-index:-1}
+html[data-v34-crosshair="strong"] .v34-map-centre:before{width:1px;height:29px}
+html[data-v34-crosshair="strong"] .v34-map-centre:after{width:29px;height:1px}
+html[data-v34-crosshair="off"] .v34-map-centre{display:none}
+/* A few deliberate animations; no whole-map repaint or continuous expensive effects. */
+.v33-board-caret{transition:transform var(--v34-motion) ease}
+.v33-dir-choice,.quick-chip,.top-button,.mini-button,.v33-route-card{transition:background var(--v34-motion) ease,border-color var(--v34-motion) ease,box-shadow var(--v34-motion) ease}
+.v33-board[open] .v32-board-body{animation:v34-fade-up var(--v34-motion) ease-out both}
+.collapsible-detail[open]>summary + *, .v33-amenities[open]>.v33-amenities-content{animation:v34-fade-up var(--v34-motion) ease-out both}
+.v34-dir-enter-right{animation:v34-slide-from-right calc(var(--v34-motion) * 1.6) cubic-bezier(.2,.7,.3,1) both}
+.v34-dir-enter-left{animation:v34-slide-from-left calc(var(--v34-motion) * 1.6) cubic-bezier(.2,.7,.3,1) both}
+.leaflet-overlay-pane .v34-next-route{animation:v34-route-reveal calc(var(--v34-motion) * 4) ease-out both}
+.bus-marker.selected{transition:box-shadow var(--v34-motion),background var(--v34-motion)}
+@keyframes v34-fade-up{from{opacity:.25;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+@keyframes v34-slide-from-right{from{opacity:.15;transform:translateX(14px)}to{opacity:1;transform:translateX(0)}}
+@keyframes v34-slide-from-left{from{opacity:.15;transform:translateX(-14px)}to{opacity:1;transform:translateX(0)}}
+@keyframes v34-route-reveal{from{stroke-opacity:0}to{stroke-opacity:1}}
+html[data-v34-anim="full"]{--v34-motion:.30s}
+html[data-v34-anim="subtle"]{--v34-motion:.16s}
+html[data-v34-anim="none"]{--v34-motion:0ms}
+html[data-v34-anim="none"] :is(.v34-dir-enter-right,.v34-dir-enter-left,.v33-board[open] .v32-board-body,.leaflet-overlay-pane .v34-next-route){animation:none!important}
+/* Text-size preference only changes interface content, never Leaflet tile sizes. */
+html[data-v34-text="large"] .sidebar,html[data-v34-text="large"] .v33-board{font-size:14px!important}
+html[data-v34-text="large"] :is(.bus-name,.detail-destination,.v33-direction-label,.v33-time,.list-hint,.panel-status){font-size:13px!important}
+html[data-v34-text="xlarge"] .sidebar,html[data-v34-text="xlarge"] .v33-board{font-size:15px!important}
+html[data-v34-text="xlarge"] :is(.bus-name,.detail-destination,.v33-direction-label,.v33-time,.list-hint,.panel-status){font-size:14px!important}
+/* Focused settings modal, scrollable within the viewport. */
+.v34-settings{position:fixed;margin:auto;inset:0;z-index:3000;min-width:0;width:min(475px,calc(100vw - 26px));max-height:min(760px,calc(100dvh - 32px));padding:0;overflow:hidden;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--text);box-shadow:0 10px 40px #0006;font:13px/1.4 Arial,Helvetica,sans-serif;color-scheme:normal}
+.v34-settings::backdrop{background:#09162699;backdrop-filter:blur(2px)}
+.v34-settings-head{display:flex;align-items:start;justify-content:space-between;gap:8px;padding:19px 19px 13px;border-bottom:1px solid var(--line);background:var(--panel)}
+.v34-kicker{font-size:10px;font-weight:700;letter-spacing:.7px;color:var(--v34-accent)}
+.v34-settings-head h2{margin:4px 0;font-size:19px}
+.v34-settings-head p{margin:0;font-size:11px;color:var(--muted)}
+.v34-close{min-width:42px;min-height:42px;border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:6px}
+.v34-settings-scroll{overflow-y:auto;max-height:calc(min(760px,100dvh - 32px) - 107px);overscroll-behavior:contain;padding:3px 19px 20px}
+.v34-settings-group{border-bottom:1px solid var(--line);padding:10px 0 13px}
+.v34-settings-group h3{margin:8px 0 7px;font-size:13px}
+.v34-field{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:51px;padding:8px 0;border-bottom:1px solid var(--line);font-weight:600}
+.v34-field:last-child{border-bottom:0}
+.v34-field small,.v34-check small{display:block;font-size:10px;color:var(--muted);margin-top:3px;line-height:1.4;font-weight:400}
+.v34-field select{width:min(178px,48%);flex:none;min-height:41px;padding:7px 5px;font-size:12px;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:5px}
+.v34-field input[type=color]{width:64px;height:39px;padding:2px;background:var(--bg);border:1px solid var(--line);border-radius:5px;cursor:pointer}
+.v34-color-field{align-items:start;flex-direction:column;gap:9px}
+.v34-swatches{display:flex;flex-wrap:wrap;gap:10px;padding:3px 0 5px}
+.v34-swatches button{width:36px;height:36px;border-radius:50%;background:var(--swatch);border:3px solid var(--panel);outline:1px solid var(--line);min-width:36px}
+.v34-swatches button[aria-pressed="true"]{outline:3px solid var(--text);outline-offset:1px}
+.v34-check{display:flex;align-items:start;gap:11px;cursor:pointer;padding:11px 0;font-weight:600;border-bottom:1px solid var(--line)}
+.v34-check:last-child{border-bottom:0}
+.v34-check input{width:19px;height:19px;flex:none;accent-color:var(--v34-accent);margin:0}
+.v34-settings-foot{display:flex;justify-content:space-between;gap:10px;padding:14px 0 0}
+.v34-settings-foot button{min-height:45px;padding:7px 12px;font-size:12px;border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:6px}
+.v34-settings-foot #v34DoneSettings{font-weight:700;min-width:95px}
+@media(max-width:720px){
+ .v34-settings{max-height:calc(100dvh - 18px);width:calc(100vw - 16px);border-radius:11px}
+ .v34-settings-scroll{max-height:calc(100dvh - 18px - 107px);padding:3px 14px 18px}
+ .v34-settings-head{padding:14px 14px 12px}
+ .v34-field{min-height:55px}
+ .v34-map-centre{opacity:.72}
+}
+@media(max-width:480px){
+ #resetView,#themeToggle{display:none!important} /* Available in settings, map already supports pan/zoom gestures. */
+ .top-bar{gap:2px!important}
+ .top-left{gap:3px!important}
+ .top-right{gap:3px!important}
+ .system-select-wrap{max-width:122px!important}
+ .system-select{max-width:122px!important}
+ .v34-settings-open{width:45px!important;min-width:45px!important}
+}
+@media(max-width:350px){.system-select-wrap,.system-select{max-width:104px!important}.v34-settings-head h2{font-size:17px}}
+@media(prefers-reduced-motion:reduce){
+ .v34-dir-enter-right,.v34-dir-enter-left,.v33-board[open] .v32-board-body,.leaflet-overlay-pane .v34-next-route{animation:none!important}
+ .v33-board-caret,.v33-dir-choice,.top-button,.quick-chip,.sidebar{transition-duration:0ms!important}
+}
+/* Off means off for the surrounding interface, not only new V3.4 effects. */
+html[data-v34-anim="none"] :is(.sidebar,.v33-board-caret,.quick-chip,.top-button,.v33-dir-choice,.v33-route-card,.bus-marker,.sidebar-close,.v32-board-body){transition:none!important;animation:none!important}
+@media(prefers-reduced-motion:reduce){
+ .v34-settings *,.v33-board *,.sidebar,.bus-marker,.quick-chip,.top-button{transition:none!important;animation:none!important}
+}
+
+/* No artwork is assigned to small/light-duty fleet entries until verified. */
+.fleet-no-image { width:100%; min-height:62px; max-width:180px; display:flex; align-items:center; justify-content:center; border:1px dashed var(--border-color, #85919e); border-radius:6px; background:color-mix(in srgb, currentColor 4%, transparent); color:inherit; font:700 12px/1.2 system-ui,sans-serif; letter-spacing:.13em; text-align:center; }
+.fleet-no-image[hidden] { display:none !important; }

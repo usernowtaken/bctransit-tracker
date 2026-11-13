@@ -6,7 +6,7 @@
   const standalone = () => window.matchMedia('(display-mode: standalone)').matches ||
       window.navigator.standalone === true;
   if ('serviceWorker' in navigator && window.isSecureContext) {
-    navigator.serviceWorker.register('/sw.js?v=3.2.0').catch((error) =>
+    navigator.serviceWorker.register('/sw.js?v=3.4.1').catch((error) =>
       console.info('Offline app shell unavailable:', error));
   }
   window.addEventListener('beforeinstallprompt', (event) => {

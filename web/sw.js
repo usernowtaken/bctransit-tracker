@@ -1,9 +1,9 @@
 /* BC Transit Bus Radar V3.0 stable - offline UI shell only; live GPS is ALWAYS network-only. */
-const APP_CACHE = 'victoria-bus-radar-shell-v3.2.0';
+const APP_CACHE = 'victoria-bus-radar-shell-v3.4.1';
 const SHELL = [
   '/', '/index.html', '/style.css?v=3.0', '/classic.css?v=3.0',
-  '/classic-dark.css?v=3.0', '/mobile.css?v=3.0', '/v27.css?v=3.0', '/v28.css?v=3.0', '/v30.css?v=3.0.5', '/v30b.css?v=3.0', '/app.js?v=3.2.0',
-  '/v30rc.css?v=3.0', '/v307.css?v=3.0.7', '/v31.css?v=3.1.0', '/v32.css?v=3.2.0', '/pwa.js?v=3.2.0', '/manifest.webmanifest', '/favicon.svg',
+  '/classic-dark.css?v=3.0', '/mobile.css?v=3.0', '/v27.css?v=3.0', '/v28.css?v=3.0', '/v30.css?v=3.0.5', '/v30b.css?v=3.0', '/motion.js?v=3.4.0', '/app.js?v=3.4.1',
+  '/v30rc.css?v=3.0', '/v307.css?v=3.0.7', '/v31.css?v=3.1.0', '/v32.css?v=3.2.0', '/v33.css?v=3.3.0', '/v34.css?v=3.4.1', '/pwa.js?v=3.4.0', '/manifest.webmanifest', '/favicon.svg',
   '/icons/icon-192.png', '/icons/icon-512.png', '/icons/maskable-512.png',
   '/icons/apple-touch-icon.png'
 ];

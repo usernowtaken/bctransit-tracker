@@ -20,5 +20,5 @@ class Nova2009RoofArt(unittest.TestCase):
         js=(ROOT/'web/app.js').read_text()
         self.assertIn('VERIFIED_NOVA_2009_REAR_ROOFS',js)
         self.assertNotIn('id="novaRearDetails"',(ROOT/'web/index.html').read_text())
-        self.assertIn('NOVA_UNKNOWN_CYCLE_MS = 1500',js)
+        self.assertIn('const isUnverifiedNova = () => false',js)
 if __name__=='__main__':unittest.main()

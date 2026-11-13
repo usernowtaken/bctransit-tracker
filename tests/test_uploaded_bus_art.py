@@ -7,6 +7,7 @@ from PIL import Image
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1] / 'web' / 'buses'
+NEW_ASSETS = {'nova_smart','nova_lfse'}
 EXPECTED = {
   'xe40','enviro500mmc_classic','xn40_cng','enviro500mmc_green',
   'xn40_classic','xn40_greenrear','nova2','vicinity30','nova3','enviro500'
@@ -21,7 +22,7 @@ class UploadedBusArtworkTests(unittest.TestCase):
         self.assertFalse(list(ROOT.glob('*.svg')))
         data=json.loads((ROOT/'asset-map.json').read_text())
         self.assertEqual(set(data['assets']),EXPECTED)
-        self.assertEqual({p.stem for p in ROOT.glob('*.png') if p.stem not in {'full-original','vicinity30-user-original'}},EXPECTED)
+        self.assertEqual({p.stem for p in ROOT.glob('*.png') if p.stem not in {'full-original','vicinity30-user-original'}},EXPECTED | NEW_ASSETS)
 
     def test_all_visible_pixels_identical_to_original(self):
         data=json.loads((ROOT/'asset-map.json').read_text())

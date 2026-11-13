@@ -32,13 +32,15 @@ class NovaFleetVariantTests(unittest.TestCase):
 
     def test_no_cross_system_2009_assumptions(self):
         for system in ['chilliwack','kelowna']:
-            self.assertIsNone(identify_vehicle(system,'3131359426')['fleet_number'])
+            vehicle=identify_vehicle(system,'3131359426')
+            self.assertEqual(vehicle['fleet_number'], '9426')
+            self.assertNotIn('nova_body_variant', vehicle)
 
     def test_all_original_drawings_preserved(self):
         self.assertTrue((ROOT/'web/buses/nova2.png').is_file())
         self.assertTrue((ROOT/'web/buses/nova3.png').is_file())
         self.assertTrue((ROOT/'web/buses/vicinity30.png').is_file())
-        self.assertFalse((ROOT/'web/buses/nova_smart_new.png').exists())
+        self.assertTrue((ROOT/'web/buses/nova_smart.png').exists())
 
     def test_ui_and_cache_versions_match(self):
         html=(ROOT/'web/index.html').read_text()
@@ -47,11 +49,11 @@ class NovaFleetVariantTests(unittest.TestCase):
         for term in ('novaSmartSpecial','detailNovaBody'):
             self.assertIn(term,html)
             self.assertIn(term,js)
-        self.assertIn('/app.js?v=3.2.0',html)
-        self.assertIn('/app.js?v=3.2.0',sw)
+        self.assertIn('/app.js?v=3.4.1',html)
+        self.assertIn('/app.js?v=3.4.1',sw)
         self.assertIn('/v30.css?v=3.0.5',html)
         self.assertIn('/v30.css?v=3.0.5',sw)
-        self.assertIn('victoria-bus-radar-shell-v3.2.0',sw)
+        self.assertIn('victoria-bus-radar-shell-v3.4.1',sw)
 
 if __name__ == '__main__':
     unittest.main()

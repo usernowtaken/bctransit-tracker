@@ -9,7 +9,7 @@
     kelowna: {name:'Kelowna', center:{lat:49.887, lon:-119.496, zoom:11}, shortcuts:['1','8','97']},
   };
   const DEFAULT_SYSTEM = 'victoria';
-  const MODEL_ASSETS = new Set(['vicinity30','nova_gen2','nova_gen3','nova_gen4','xn40','xe40','enviro500','enviro500mmc','generic']);
+  const MODEL_ASSETS = new Set(['vicinity30','nova_gen2','nova_gen3','nova_gen4','nova_lfse','light_duty','xn40','xe40','enviro500','enviro500mmc','generic']);
   // NovaBus *generations* are independent of which reference illustration is displayed.
   const NOVA_GENERATION_FILTERS = Object.freeze({nova_gen2:2,nova_gen3:3,nova_gen4:4});
   // Every illustration below is an EXACT pixel crop from the uploaded full.png.
@@ -19,6 +19,7 @@
     vicinity30: [{id:'vicinity30', name:'Vehicle illustration'}],
     nova2: [{id:'nova2', name:'Vehicle illustration'}],
     nova3: [{id:'nova3', name:'Vehicle illustration'}],
+    nova_lfse: [{id:'nova_lfse', name:'NovaBus LFSe+ electric illustration'}],
     xn40: [
       {id:'xn40_classic', name:'Classic stripes'},
       {id:'xn40_greenrear', name:'Classic · green rear'},
@@ -83,28 +84,21 @@
     const batch = XN40_FLEET_ART.find(row => number >= row.first && number <= row.last);
     return BUS_ART.xn40.find(variant => variant.id === batch?.image) || null;
   };
-  // Unverified 2009 LFS units alternate their two existing source drawings.
-  // A separate phase origin is kept for each vehicle; known fleet/body records and
-  // confirmed appearances NEVER cycle. No new artwork is generated.
-  const NOVA_UNKNOWN_CYCLE_MS = 1500;
-  const novaCycleStart = new Map();
-  const isUnverifiedNova = (vehicle) => isNova2009(vehicle) && novaRearStyle(vehicle) === 'unknown';
-  const unverifiedNovaImage = (vehicle, now = Date.now()) => {
-    const key = artKey(vehicle);
-    if (!novaCycleStart.has(key)) novaCycleStart.set(key, now);
-    const phase = Math.floor(Math.max(0, now - novaCycleStart.get(key)) / NOVA_UNKNOWN_CYCLE_MS) % 2;
-    return phase === 0 ? 'nova2' : 'nova3';
-  };
+  // Gen 3 uses the raised-rear drawing by default; verified flat roofs
+  // remain flat. No cycling and no extra image requests.
+  const isUnverifiedNova = () => false;
   const busArtVariant = (vehicle) => {
+    // Unique photographed Smart LFS prototype (2012). No other bus uses its art.
+    if (state.system === 'victoria' && String(vehicle?.fleet_number) === '9434' && vehicle?.model_key === 'nova3') {
+      return {id:'nova_smart', name:'2012 Smart LFS prototype illustration'};
+    }
     // Model remains Gen 3 (2009), regardless of which reference drawing
     // is shown. Confirmed roof appearances stay fixed by fleet number.
     if (isNova2009(vehicle)) {
       const style = novaRearStyle(vehicle);
-      const key = style === 'unknown' ? unverifiedNovaImage(vehicle)
-        : style === 'raised' ? 'nova3' : 'nova2';
-      const name = style === 'unknown'
-        ? 'Unverified roof (alternating flat/raised reference drawings)'
-        : style === 'raised' ? 'Raised-rear reference drawing' : 'Flat-rear reference drawing';
+      const key = style === 'standard' ? 'nova2' : 'nova3';
+      const name = style === 'standard' ? 'Flat-rear reference drawing' :
+        style === 'raised' ? 'Raised-rear reference drawing' : 'Raised-rear reference (default, not verified for this fleet number)';
       return {id:key, name};
     }
     const available = BUS_ART[vehicle?.model_key] || [];
@@ -143,6 +137,10 @@
   const mobile = () => window.matchMedia('(max-width: 720px)').matches;
   const arrivalFormatter = new Intl.DateTimeFormat('en-CA', {timeZone:'America/Vancouver', hour:'2-digit', minute:'2-digit', hour12:false});
   const lowMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const visualMotion = () => !lowMotion() && state.customization.animations !== 'none';
+  const ACCENT_PRESETS = Object.freeze({blue:'#1a73e8',teal:'#009688',green:'#29834c',orange:'#c36a20',purple:'#7957c2',rose:'#bb4d7c'});
+  const DEFAULT_CUSTOMIZATION = Object.freeze({accent:'blue',customColor:'#1a73e8',animations:'subtle',crosshair:'subtle',textSize:'normal',hoverPreview:true,tapPreview:true,nextTrip:true});
+
   const touchScreen = () => window.matchMedia('(pointer: coarse)').matches;
   let lastListSignature = '';
   let lastListStatus = '';
@@ -186,6 +184,10 @@
     restoredCache: false,
     closed: false,
     routeLayer: null,
+    nextRouteLayer:null, nextTripRequestSerial:0, nextTripOverlayKey:null,
+    motionEnabled:true, motionTracks:new Map(),
+    customization:{...DEFAULT_CUSTOMIZATION},directionAnimation:null,
+    boardPointer:null,boardPointerMode:null,boardPointerMarker:null,boardDirections:new Map(),
     historyLayer: null,
     historyVisible: false,
     historyPoints: [],
@@ -442,18 +444,37 @@
     $('listMore').hidden = filtered.length <= MAX_LIST;
     if (filtered.length > MAX_LIST) $('listMore').textContent = `Showing first ${MAX_LIST} of ${filtered.length} buses. Filter by route to narrow results.`;
   }
-  // Only the selected, visible vehicle needs an image cycle. We reuse a single
-  // cheap timer; it does not restart when the realtime map data refreshes.
-  function refreshUnverifiedNovaArtwork() {
-    if (document.visibilityState !== 'visible' || !state.selected || (mobile() && state.closed)) return;
-    const vehicle = state.vehicles.find(v => v.id === state.selected);
-    if (!vehicle || !isUnverifiedNova(vehicle)) return;
-    const art = busArtVariant(vehicle);
-    const image = $('detailBusImage');
-    const desired = '/buses/' + art.id + '.png?v=3.2.0';
-    if (image.getAttribute('src') !== desired) {
-      image.src = desired;
-      image.alt = `${vehicle.model || 'NovaBus LFS'} — unverified roof, alternating ${art.id === 'nova3' ? 'raised' : 'flat'} illustration`;
+  // Vehicle amenities are informational fleet attributes, never inferred from GPS.
+  // Source: BC Transit fleet/NextRide descriptions and dated fleet announcements.
+  function updateAmenities(vehicle) {
+    const host=$('amenitiesList'); if (!host) return;
+    host.replaceChildren();
+    const fleet=Number(vehicle.fleet_number);
+    const model=vehicle.model_key;
+    const victoria=state.system==='victoria';
+    const usb = victoria && model==='enviro500mmc'
+      ? ['USB charging','Provided on newer Victoria Enviro500 buses (ports and availability vary)','confirmed']
+      : victoria && model==='xn40' && fleet>=1213 && fleet<=1277
+        ? ['USB charging','Documented on newer Victoria CNG New Flyer buses; verify individual equipment','fleet']
+        : victoria && model==='xe40'
+          ? ['USB charging','Included in BC Transit electric-bus equipment plans; individual bus not checked','fleet']
+          : ['USB charging','Not verified for this fleet number','unknown'];
+    const lcd = model==='vicinity30' || (victoria && fleet===1192)
+      ? ['NextRide LCD screen','Not listed for this bus; stop announcements may still be available','unknown']
+      : ['NextRide LCD screen','Expected on many newer buses; individual installation not confirmed','fleet'];
+    const entries=[usb,lcd,
+      ['Audio stop announcements','NextRide-supported transit service; onboard operation may vary','fleet'],
+      ['Accessible boarding','BC Transit describes its fleet as accessible','confirmed'],
+      ['Bicycle rack','Check available spaces on arrival; rack capacity varies','fleet']];
+    if (victoria && model==='enviro500mmc')
+      entries.push(['Double-decker seating','Upper level seats; newer models have USB ports and onboard display equipment','confirmed']);
+    for (const [title,description,status] of entries) {
+      const item=document.createElement('div');item.className='v33-amenity';
+      const head=document.createElement('strong');head.textContent=title;
+      const chip=document.createElement('small');chip.className='v33-amenity-status '+status;
+      chip.textContent=status==='confirmed'?'Fleet feature':status==='fleet'?'Varies / likely':'Not verified';
+      const note=document.createElement('span');note.textContent=description;
+      item.append(head,chip,note);host.append(item);
     }
   }
   function updateDetails() {
@@ -471,6 +492,7 @@
     $('detailFleetConfidence').hidden = Boolean(fleetNumber);
     const smart9434 = state.system === 'victoria' && String(fleetNumber) === '9434' && vehicle.model_key === 'nova3';
     $('detailModel').textContent = smart9434 ? 'NovaBus LFS Smart Bus (2012 prototype)' : (vehicle.model || 'Model unknown');
+    updateAmenities(vehicle);
     const smartPanel = $('novaSmartSpecial');
     smartPanel.hidden = !smart9434;
     $('fleetProfile').classList.toggle('smart-prototype', smart9434);
@@ -481,7 +503,7 @@
     if (body === 'raised') bodyText = String(fleetNumber) === '9426' ? 'Raised rear · white LED sign (photographed)' : 'Raised rear · photographed fleet unit';
     else if (body === 'flat') bodyText = 'Flat rear · photographed fleet unit';
     else if (body === 'smart') bodyText = 'Full-length roof fairings · 2012 Smart Bus prototype';
-    else if (nova2009) bodyText = 'Rear roof unverified · cycling flat / raised drawings';
+    else if (nova2009) bodyText = 'Rear roof unverified · raised-rear illustration shown by default';
     // Barp's 2009 Victoria gallery documents frameless windows on the 9354+ order.
     const fleetAsNumber = Number(fleetNumber);
     if (nova2009 && fleetAsNumber >= 9354 && fleetAsNumber <= 9433) {
@@ -510,17 +532,24 @@
     // Keep XN40 artwork automatic, but hide its selector for a cleaner profile UI.
     artPicker.hidden = true; // All fleet artwork is automatic; no profile artwork dropdown.
     const chosenArt = busArtVariant(vehicle);
-    artContainer.hidden = !chosenArt;
+    const noImage = $('fleetNoImage');
+    const isSmallBus = vehicle.model_key === 'light_duty';
+    artContainer.hidden = !chosenArt && !isSmallBus;
+    noImage.hidden = !isSmallBus;
     if (chosenArt) {
       const manualArt = variants.find(v => v.id === artChoices[artKey(vehicle)]);
       artSelect.value = vehicle.model_key === 'xn40' && !manualArt ? 'auto' : chosenArt.id;
-      const source = '/buses/' + chosenArt.id + '.png?v=3.2.0';
+      const source = '/buses/' + chosenArt.id + '.png?v=3.4.1';
       if (busImage.getAttribute('src') !== source) busImage.src = source;
       busImage.hidden = false;
       busImage.alt = `${vehicle.model || 'Bus'} — vehicle illustration (${chosenArt.name})`;
+      noImage.hidden = true;
+      busImage.onerror = () => { if (busImage.getAttribute('src') === source) { busImage.hidden = true; noImage.hidden = false; noImage.textContent = 'NO IMAGE'; } };
+      busImage.onload = () => { if (busImage.getAttribute('src') === source) { busImage.hidden = false; noImage.hidden = true; } };
     } else {
-      busImage.hidden = true; // No generic illustration: use ONLY the supplied images.
+      busImage.hidden = true; // Never use another vehicle's drawing as a substitute.
       busImage.removeAttribute('src');
+      noImage.textContent = 'NO IMAGE';
     }
     // Roof styles are automatic: verified examples fixed, unknown 2009 units alternating.
     const proximity = vehicle.route_proximity || {};
@@ -553,6 +582,7 @@
     $('detailFeedLabel').textContent = vehicle.label || 'Not supplied';
     $('detailId').textContent = vehicle.id || '—';
     $('detailAge').textContent = timeAgo(vehicle.timestamp);
+    updateMotionLabel(vehicle);
     $('detailSpeed').textContent = Number.isFinite(vehicle.speed_mps) ? `${Math.round(vehicle.speed_mps * 3.6)} km/h` : 'Not provided';
     $('detailBearing').textContent = Number.isFinite(vehicle.bearing) ? `${Math.round(vehicle.bearing)}°` : 'Not provided';
     $('detailLat').textContent = Number(vehicle.lat).toFixed(5);
@@ -790,6 +820,7 @@
       state.arrivalStatus = 'unavailable';
     }
     loadSelectedRoute(vehicle);
+    refreshNextTripOverlay(vehicle);
     refreshSelectedArrivals();
     if (center && state.map) state.map.setView([vehicle.lat, vehicle.lon], Math.max(state.map.getZoom(), 13), { animate:false });
     renderMap();
@@ -804,6 +835,7 @@
     state.selected = null;
     state.following = false;
     state.routeRequestSerial++;
+    state.nextTripRequestSerial++;state.nextTripOverlayKey=null;state.nextRouteLayer?.clearLayers();$('nextTripLegend').hidden=true;
     state.routeDetail = null;
     state.stopMarkers.clear();
     state.arrivals = new Map();
@@ -881,6 +913,46 @@
     if (focused) rendered.push({key:`bus:${focused.id}`,lat:focused.lat,lon:focused.lon,type:'bus',vehicle:focused});
     return rendered;
   }
+  // One source of visual truth for the selected vehicle. Older feed timestamps
+  // never roll the animation back; the GPS data itself is never modified.
+  function selectedTracker(v) {
+    if(!v || !window.BusRadarMotion) return null;
+    const key=`${state.system}:${v.id}`;
+    let tracker=state.motionTracks.get(key);
+    if(!tracker){tracker=new window.BusRadarMotion.Tracker(state.system);state.motionTracks.set(key,tracker);}
+    tracker.ingest(v,Date.now(),state.system);
+    if(state.motionTracks.size>45)state.motionTracks.delete(state.motionTracks.keys().next().value);
+    return tracker;
+  }
+  function selectedMotionSample(v,now=Date.now()) {
+    const tracker=selectedTracker(v);
+    return tracker?.sample(now,state.motionEnabled && visualMotion()) || null;
+  }
+  function selectedMotionPoint(v,now=Date.now()) {
+    if(!state.motionEnabled || !visualMotion())return null;
+    return selectedMotionSample(v,now)?.point || null;
+  }
+  function updateMotionLabel(v) {
+    const el=$('motionStatus');if(!el || !v)return;
+    const active=selectedMotionSample(v);
+    el.textContent=active?.reconciling?'Smoothing toward a new GPS fix · actual GPS '+timeAgo(v.timestamp):
+      active?.held?'Short movement estimate held · actual GPS '+timeAgo(v.timestamp):
+      active?.estimated?'Visual motion estimate — not a new GPS report · actual GPS '+timeAgo(v.timestamp):
+      'Marker uses the last reported GPS fix · '+timeAgo(v.timestamp);
+  }
+  function updateSelectedMotion() {
+    if (document.visibilityState!=='visible'||!state.map||!state.selected)return;
+    const v=state.vehicles.find(x=>x.id===state.selected);
+    if(!v)return;
+    const record=state.markers.get(`bus:${v.id}`);
+    if(!record)return;
+    const motion=selectedMotionSample(v);
+    const target=state.motionEnabled && visualMotion() && motion ? motion.point : [v.lat,v.lon];
+    const last=record.marker.getLatLng();
+    if(Math.abs(last.lat-target[0])+Math.abs(last.lng-target[1])>0.0000002)
+      record.marker.setLatLng(target);
+    updateMotionLabel(v);
+  }
   function renderMap() {
     if (!state.map) return;
     const desired = computeVisibleMarkers();
@@ -894,7 +966,8 @@
       let record = state.markers.get(item.key);
       if (!record) {
         const icon = item.type === 'bus' ? markerIcon(item.vehicle, selected) : clusterIcon(item.count);
-        const marker = L.marker([item.lat,item.lon], { icon, keyboard: !touchScreen(), zIndexOffset:selected ? 1000 : 0 });
+        const drawn=selected?selectedMotionPoint(item.vehicle)||[item.lat,item.lon]:[item.lat,item.lon];
+        const marker = L.marker(drawn, { icon, keyboard: !touchScreen(), zIndexOffset:selected ? 1000 : 0 });
         record = {marker, sig, latest:item};
         // Attach once, read the latest item each time; do not detach/rebind on GPS refresh.
         marker.on('click', () => {
@@ -907,15 +980,16 @@
       } else {
         record.latest = item;
         const previous = record.marker.getLatLng();
-        if (Math.abs(previous.lat-item.lat)>0.000001 || Math.abs(previous.lng-item.lon)>0.000001)
-        {
-          // Ease only actual position corrections, not map pans or zooms.
-          const element = record.marker.getElement();
-          if (element && state.positionRefresh && item.type === 'bus' && !lowMotion() && !(mobile() && state.lite)) {
-            element.style.transition = 'transform 0.8s ease-out';
-            setTimeout(() => { if (element.isConnected) element.style.transition = ''; }, 850);
+        const target=selected?selectedMotionPoint(item.vehicle)||[item.lat,item.lon]:[item.lat,item.lon];
+        if(Math.abs(previous.lat-target[0])>0.000001 || Math.abs(previous.lng-target[1])>0.000001){
+          // The selected marker is interpolated in the shared motion engine.
+          // Never overwrite it with raw GPS before the correction has settled.
+          const element=record.marker.getElement();
+          if(element && !selected && state.positionRefresh && visualMotion() && !(mobile() && state.lite)) {
+            element.style.transition='transform .85s ease-out';
+            setTimeout(()=>{if(element.isConnected)element.style.transition='';},900);
           }
-          record.marker.setLatLng([item.lat,item.lon]);
+          record.marker.setLatLng(target);
         }
         if (record.sig !== sig) {
           record.marker.setIcon(item.type === 'bus' ? markerIcon(item.vehicle,selected) : clusterIcon(item.count));
@@ -1042,6 +1116,38 @@
       }
     }
   }
+  // A *different*, translucent and dashed path means the NEXT SCHEDULED trip.
+  // Never imply that a vehicle has actually changed route or is on that path.
+  async function refreshNextTripOverlay(vehicle, force=false) {
+    const trip=vehicle?.next_run?.trip_id;
+    const visible=Boolean(trip && state.selected===vehicle.id && $('nextTripMapToggle').checked);
+    const key=visible?`${state.system}:${vehicle.id}:${trip}`:'none';
+    if (!force && key===state.nextTripOverlayKey) return;
+    state.nextTripOverlayKey=key;
+    const serial=++state.nextTripRequestSerial;
+    state.nextRouteLayer?.clearLayers();
+    $('nextTripLegend').hidden=true;
+    const status=$('nextTripOverlayStatus');
+    if (!visible) {status.textContent=trip?'Next scheduled route hidden':'No next scheduled trip to draw';return;}
+    status.textContent='Loading dashed next-trip line (scheduled only)…';
+    try {
+      let detail=routeCache.get(`${state.system}:${trip}`);
+      if(!detail){
+        const response=await fetch(apiPath('route',{trip_id:trip}),{cache:'no-store'});
+        if(!response.ok) throw new Error('No next-trip shape available');
+        detail=await response.json();
+        routeCache.set(`${state.system}:${trip}`,detail);
+      }
+      if(serial!==state.nextTripRequestSerial||!state.selected||state.selected!==vehicle.id||!$('nextTripMapToggle').checked)return;
+      const points=detail.shape;
+      if (!Array.isArray(points)||points.length<2){status.textContent='Next trip is scheduled, but no route shape is published';return;}
+      const color=state.theme==='classic'?'#1864c7':'#b2c9ff';
+      L.polyline(points,{color,weight:6,opacity:0.25,dashArray:'11 12',interactive:false,className:'v34-next-route'}).addTo(state.nextRouteLayer);
+      L.polyline(points,{color,weight:3,opacity:0.60,dashArray:'5 13',interactive:false,className:'v34-next-route'}).addTo(state.nextRouteLayer);
+      status.textContent=`Dashed line: next scheduled Route ${vehicle.next_run.route||'?'}${detail.headsign?' · '+detail.headsign:''} · not confirmed`;
+      $('nextTripLegend').hidden=false;
+    } catch(e){if(serial===state.nextTripRequestSerial) status.textContent='Next scheduled route geometry unavailable';}
+  }
   async function loadSelectedRoute(vehicle) {
     const tripId = vehicle.trip_id;
     state.routeRequestSerial++;
@@ -1128,9 +1234,10 @@
     if (state.tileLayer) state.tileLayer.setUrl(tileUrlForTheme(state.theme));
     if (state.selected) {
       const vehicle = state.vehicles.find((v) => v.id === state.selected);
-      if (vehicle) { updateDetails(); loadSelectedRoute(vehicle); }
+      if (vehicle) { updateDetails(); loadSelectedRoute(vehicle); refreshNextTripOverlay(vehicle,true); }
     }
     if (state.historyVisible && state.historyPoints.length) drawHistory();
+    if($('v34Theme'))$('v34Theme').value=state.theme;
     if (save) try { localStorage.setItem('bct_theme', state.theme); } catch (_) {}
   }
   function restoredView() {
@@ -1152,7 +1259,7 @@
     })); } catch (_) {}
   }
   let boardMapTimer=null;
-  function scheduleBoardUpdate() {clearTimeout(boardMapTimer);boardMapTimer=setTimeout(()=>refreshNearbyBoard(),700);}
+  function scheduleBoardUpdate() {clearTimeout(boardMapTimer);boardMapTimer=setTimeout(()=>refreshNearbyBoard(),650);}
   function initMap() {
     if (!mobile()) {
       try {state.closed=localStorage.getItem('bct_desktop_sidebar_closed')==='true';} catch (_) {}
@@ -1176,7 +1283,17 @@
       subdomains: key ? 'abcd' : 'abc', maxZoom:19, maxNativeZoom:key ? 18 : 19, crossOrigin:false, updateWhenIdle:true, keepBuffer:mobile() && state.lite ? 1 : 2,
     }).addTo(map);
     L.control.zoom({position:'bottomright'}).addTo(map);
-    map.on('zoomend moveend', () => {renderMap(); saveMapView(); if(boardOpen() && !state.userLocation) scheduleBoardUpdate();});
+    map.on('zoomend moveend', () => {renderMap(); saveMapView(); if(boardOpen() && !state.userLocation && !state.boardPointer) scheduleBoardUpdate();});
+    let boardHoverAt=0;
+    map.on('mousemove',event=>{
+      if(touchScreen()||!state.customization.hoverPreview||!boardOpen()||document.body.classList.contains('detail-open'))return;
+      if(Date.now()-boardHoverAt<180)return;
+      boardHoverAt=Date.now();showBoardPoint(event.latlng.lat,event.latlng.lng,'hover');
+    });
+    map.on('click',event=>{
+      if(!state.customization.tapPreview||!boardOpen()||document.body.classList.contains('detail-open'))return;
+      showBoardPoint(event.latlng.lat,event.latlng.lng,'tap');
+    });
     state.map = map;
     // Monitor the *actual* Leaflet container, including desktop monitor scaling.
     if (typeof ResizeObserver !== 'undefined') {
@@ -1188,6 +1305,7 @@
       if (event.propertyName === 'margin-left' || event.propertyName === 'transform') refreshMapLayout();
     });
     state.routeLayer = L.layerGroup().addTo(map);
+    state.nextRouteLayer = L.layerGroup().addTo(map);
     state.historyLayer = L.layerGroup().addTo(map);
   }
   function updateMobileOpenLabel() {
@@ -1233,12 +1351,19 @@
       state.markers.clear();
       renderMap();
     }
+    if($('v34Lite'))syncSettingsControls();
     if (persist) try { localStorage.setItem('bct_mobile_lite', String(state.lite)); } catch (_) {}
   }
   function applyData(data, cached = false) {
     if (!data || !Array.isArray(data.vehicles) || (data.system && data.system !== state.system)) return;
     state.data = data;
     state.vehicles = data.vehicles.filter((v) => Number.isFinite(v.lat) && Number.isFinite(v.lon) && v.id);
+    // Update visual tracking for the selected vehicle only. The unmodified
+    // vehicle snapshot is still used by trips, ETAs, stop data and GPS history.
+    if (state.selected) {
+      const focused=state.vehicles.find(v=>v.id===state.selected);
+      if(focused)selectedTracker(focused);
+    }
     state.restoredCache = cached;
     if (state.selected && !state.vehicles.some((v) => v.id === state.selected)) leaveDetails();
     if (state.selected) {
@@ -1251,6 +1376,7 @@
           refreshSelectedArrivals();
         }
         const stops = `${selected.stops?.previous?.sequence ?? ''}:${selected.stops?.next?.sequence ?? ''}`;
+        refreshNextTripOverlay(selected);
         if (state.routeTrip !== selected.trip_id || state.routeMetadataStamp !== (data.metadata_updated_at || null) ||
           (state.routeStopSignature !== stops && routeCache.has(`${state.system}:${selected.trip_id}`))) {
           loadSelectedRoute(selected);
@@ -1267,6 +1393,7 @@
     state.positionRefresh = true;
     renderStatus(); renderList(); renderMap();
     state.positionRefresh = false;
+    updateSelectedMotion();
     if (state.userLocation) renderNearby();
     updateBoardFromVehicles();
     if(state.favorites.buses.length && !state.selected && !$('favoritesSection').hidden) renderFavorites();
@@ -1590,101 +1717,175 @@
         : 'Location unavailable. Check GPS/location settings or try again.';
     },{enableHighAccuracy:false,timeout:10000,maximumAge:30000});
   }
-  // The nearby board is independent of the sidebar. Browser GPS coordinates
-  // are never sent to the server; only publicly published stop IDs are requested.
+  // Route-first nearby board. Browser coordinates stay local; the API receives
+  // only the public identifiers of nearby published stops (never the GPS point).
   const boardOpen = () => Boolean($('nearbyBoard')?.open);
   function boardOrigin() {
+    if (state.boardPointer) return {...state.boardPointer,label:state.boardPointerMode==='tap'?'Near selected map point':'Near map pointer'};
     if (state.userLocation) return {lat:state.userLocation.lat,lon:state.userLocation.lon,label:'Near your location'};
     const center=state.map?.getCenter();
     return center ? {lat:center.lat,lon:center.lng,label:'Near map centre'} : null;
   }
+  function showBoardPoint(lat,lon,mode='hover') {
+    if(!boardOpen()||!Number.isFinite(lat)||!Number.isFinite(lon))return;
+    const prior=state.boardPointer;
+    if(prior && metersBetween(prior.lat,prior.lon,lat,lon)<25 && state.boardPointerMode===mode)return;
+    state.boardPointer={lat,lon};state.boardPointerMode=mode;
+    if(state.map){
+      if(!state.boardPointerMarker)state.boardPointerMarker=L.circleMarker([lat,lon],{
+        radius:6,color:'#166dca',weight:2,fillColor:'#fff',fillOpacity:0.85,
+        interactive:false,className:'v33-map-crosshair'}).addTo(state.map);
+      else state.boardPointerMarker.setLatLng([lat,lon]);
+    }
+    scheduleBoardUpdate();
+  }
+  function clearBoardPoint() {
+    state.boardPointer=null;state.boardPointerMode=null;
+    state.boardPointerMarker?.remove();state.boardPointerMarker=null;
+    if(boardOpen())refreshNearbyBoard(true);
+  }
   function closestStopToBus(v, stops) {
-    let nearest=null, best=Infinity;
-    for (const s of stops) {
-      const d=metersBetween(v.lat,v.lon,s.lat,s.lon);
-      if (d<best){best=d;nearest=s;}
+    let nearest=null,best=Infinity;
+    for (const stop of stops) {
+      const d=metersBetween(v.lat,v.lon,stop.lat,stop.lon);
+      if(d<best){best=d;nearest=stop;}
     }
     return nearest ? `${nearest.name} · ${distanceLabel(best)} away` : 'Nearest stop unknown';
   }
   function renderNearbyBoard() {
     if (!boardOpen()) return;
-    const host=$('boardResults');host.replaceChildren();
+    const host=$('boardResults');
+    const previousScroll=$('nearbyBoard').querySelector('.v32-board-body')?.scrollTop||0;
+    host.replaceChildren();
     const origin=boardOrigin();
-    if (!origin) { $('boardHint').textContent='Map not ready';return; }
-    $('boardHint').textContent=origin.label+' · showing published stops and active vehicles';
+    if(!origin){$('boardHint').textContent='Map loading…';return;}
     const stops=stopCatalog.get(state.system);
-    if (!stops) { host.textContent='Loading stop locations…';return; }
-    const proximity=(s)=>metersBetween(origin.lat,origin.lon,s.lat,s.lon);
-    const nearby=[...stops].sort((a,b)=>proximity(a)-proximity(b)).slice(0,3);
+    const pointerHint=touchScreen()?(state.customization.tapPreview?' · tap map to choose a different area':''):
+      (state.customization.hoverPreview?' · hover on map to explore':' · pan the map to explore');
+    $('boardHint').textContent=origin.label+pointerHint;
+    if(!stops){host.textContent='Loading route and stop locations…';return;}
+    const nearby=stops.map(stop=>({stop,distance:metersBetween(origin.lat,origin.lon,stop.lat,stop.lon)}))
+      .sort((a,b)=>a.distance-b.distance).slice(0,10);
     const payload=state.boardPayload;
     const hasData=Boolean(payload && state.boardAt?.system===state.system &&
-      nearby.every(s=>state.boardAt.ids.includes(s.id)));
-    const heading=document.createElement('h3');heading.textContent='Next departures';host.append(heading);
-    for (const stop of nearby) {
-      const block=document.createElement('section');block.className='v32-board-stop';
-      const name=document.createElement('button');name.className='v32-board-stopname';name.type='button';
-      name.textContent=`${stop.name}  ·  ${distanceLabel(proximity(stop))}`;
-      name.addEventListener('click',()=>focusStop(stop));block.append(name);
-      const data=hasData?payload.stops.find(s=>s.stop_id===stop.id):null;
-      if (!data) {const note=document.createElement('p');note.textContent='Checking schedule…';block.append(note);}
-      else if (!data.arrivals?.length) {const note=document.createElement('p');note.textContent='No upcoming departures published';block.append(note);}
-      else for (const a of data.arrivals.slice(0,4)) {
-        const item=document.createElement('div');item.className='v32-departure';
-        const rt=a.source==='live';
-        const mins=Math.max(0,Math.round((a.arrival_at-Date.now()/1000)/60));
-        const route=document.createElement('strong');route.className='v32-departure-route';route.textContent=a.route||'?';
-        const where=document.createElement('span');where.className='v32-departure-dest';where.textContent=a.destination||'Destination unknown';
-        const eta=document.createElement('span');eta.className='v32-departure-eta';eta.textContent=`${mins}m`;
-        const stamp=document.createElement('small');stamp.textContent=`${rt?'Live':'Sched'} · ${arrivalFormatter.format(new Date(a.arrival_at*1000))}`;
-        stamp.className=rt?'v32-live':'v32-sched';
-        item.append(route,where,eta,stamp);block.append(item);
+      nearby.every(row=>state.boardAt.ids.includes(row.stop.id)));
+    if(!hasData){host.textContent='Checking nearby routes and predictions…';return;}
+    // Aggregate by public route first, then final destination. Duplicate trip
+    // predictions across nearby stops are de-duplicated; pickup stop is secondary.
+    const routes=new Map();
+    for(const entry of nearby){
+      const stopData=payload.stops?.find(row=>row.stop_id===entry.stop.id);
+      for(const arrival of stopData?.arrivals||[]){
+        if(!arrival.route||!Number.isFinite(arrival.arrival_at))continue;
+        const route=String(arrival.route),dest=String(arrival.destination||'Direction unknown');
+        if(!routes.has(route))routes.set(route,new Map());
+        const directions=routes.get(route);
+        if(!directions.has(dest))directions.set(dest,[]);
+        directions.get(dest).push({...arrival,stop:entry.stop,distance:entry.distance});
       }
-      host.append(block);
     }
-    const busHead=document.createElement('h3');busHead.textContent='Closest reporting buses';host.append(busHead);
-    const buses=[...state.vehicles].filter(v=>Number.isFinite(v.lat)&&Number.isFinite(v.lon))
-      .sort((a,b)=>metersBetween(origin.lat,origin.lon,a.lat,a.lon)-metersBetween(origin.lat,origin.lon,b.lat,b.lon)).slice(0,4);
-    if (!buses.length) {const t=document.createElement('p');t.textContent='No buses currently reporting';host.append(t);}
-    for (const v of buses) {
-      const btn=document.createElement('button');btn.type='button';btn.className='v32-board-bus';
-      const nearest=closestStopToBus(v,stops);
-      btn.textContent=`Route ${label(v.route)} · Bus ${v.fleet_number||v.id} — ${nearest}${ageSeconds(v)>120?' · stale GPS':''}`;
-      btn.addEventListener('click',()=>selectVehicle(v.id,true));host.append(btn);
+    if(!routes.size){const note=document.createElement('p');note.textContent='No scheduled departures found at nearby stops in the next 90 minutes. Try a different point on the map.';host.append(note);return;}
+    const sorted=[...routes].map(([route,directions])=>{
+      for(const [dest,arrivals] of directions){
+        arrivals.sort((a,b)=>a.distance-b.distance||a.arrival_at-b.arrival_at);
+        // Select a nearby pickup stop for this route-direction; do not merge
+        // ETAs for a single trip across several different stop locations.
+        const pickup=arrivals[0]?.stop.id;
+        const atStop=arrivals.filter(a=>a.stop.id===pickup).sort((a,b)=>a.arrival_at-b.arrival_at);
+        const seen=new Set();
+        directions.set(dest,atStop.filter(a=>{const k=a.trip_id+':'+a.arrival_at;if(seen.has(k))return false;seen.add(k);return true;}).slice(0,3));
+      }
+      return {route,directions,minDistance:Math.min(...[...directions.values()].flat().map(a=>a.distance))};
+    }).sort((a,b)=>a.minDistance-b.minDistance||a.route.localeCompare(b.route,undefined,{numeric:true})).slice(0,12);
+    for(const item of sorted){
+      const dests=[...item.directions.keys()];
+      const selectionKey=state.system+':'+item.route;
+      const chosen=state.boardDirections.has(selectionKey)&&item.directions.has(state.boardDirections.get(selectionKey))
+        ? state.boardDirections.get(selectionKey):dests[0];
+      state.boardDirections.set(selectionKey,chosen);
+      const rows=item.directions.get(chosen)||[];
+      const card=document.createElement('article');card.className='v33-route-card';
+      if(state.directionAnimation?.key===selectionKey && visualMotion())
+        card.classList.add(state.directionAnimation.forward?'v34-dir-enter-right':'v34-dir-enter-left');
+      const header=document.createElement('div');header.className='v33-route-header';
+      const badge=document.createElement('strong');badge.className='v33-route-badge';badge.textContent=item.route;
+      const direction=document.createElement('div');direction.className='v33-direction-wrap';
+      const caption=document.createElement('span');caption.className='v33-direction-label';caption.textContent=chosen;
+      direction.append(caption);
+      const eta=document.createElement('strong');eta.className='v33-next-eta';
+      const upcoming=rows[0];
+      eta.textContent=upcoming?`${Math.max(0,Math.round((upcoming.arrival_at-Date.now()/1000)/60))} min`:'—';
+      header.append(badge,direction,eta);card.append(header);
+      if(dests.length>1){
+        const dirs=document.createElement('div');dirs.className='v33-directions';dirs.setAttribute('aria-label',`Route ${item.route} direction`);
+        dests.forEach(dest=>{
+          const btn=document.createElement('button');btn.type='button';btn.className='v33-dir-choice'+(chosen===dest?' active':'');
+          btn.textContent=dest;btn.setAttribute('aria-pressed',String(chosen===dest));
+          btn.addEventListener('click',()=>{
+            if(chosen===dest)return;
+            state.directionAnimation={key:selectionKey,forward:dests.indexOf(dest)>dests.indexOf(chosen)};
+            state.boardDirections.set(selectionKey,dest);renderNearbyBoard();state.directionAnimation=null;
+          });dirs.append(btn);
+        });card.append(dirs);
+        let startX=0,startY=0;
+        card.addEventListener('touchstart',ev=>{startX=ev.touches[0].clientX;startY=ev.touches[0].clientY;},{passive:true});
+        card.addEventListener('touchend',ev=>{
+          const dx=ev.changedTouches[0].clientX-startX,dy=ev.changedTouches[0].clientY-startY;
+          if(Math.abs(dx)<45||Math.abs(dx)<Math.abs(dy)*1.3)return;
+          const next=(dests.indexOf(chosen)+(dx<0?1:-1)+dests.length)%dests.length;
+          state.directionAnimation={key:selectionKey,forward:dx<0};
+          state.boardDirections.set(selectionKey,dests[next]);renderNearbyBoard();state.directionAnimation=null;
+        },{passive:true});
+      }
+      const times=document.createElement('div');times.className='v33-route-times';
+      for(const a of rows){
+        const chip=document.createElement('span');chip.className='v33-time'+(a.source==='live'?' live':'');
+        const mins=Math.max(0,Math.round((a.arrival_at-Date.now()/1000)/60));
+        chip.textContent=`${mins}m ${a.source==='live'?'● Live':'Sched'}`;
+        chip.title=`${arrivalFormatter.format(new Date(a.arrival_at*1000))} · ${a.source==='live'?'Realtime prediction':'Published timetable'}`;
+        times.append(chip);
+      }
+      if(!rows.length){const no=document.createElement('span');no.textContent='No upcoming times';times.append(no);}
+      card.append(times);
+      if(upcoming){const at=document.createElement('small');at.className='v33-boarding';
+        at.textContent=`Board at ${upcoming.stop.name} · ${distanceLabel(upcoming.distance)} away`;
+        card.append(at);}
+      host.append(card);
     }
+    $('nearbyBoard').querySelector('.v32-board-body').scrollTop=previousScroll;
   }
   async function refreshNearbyBoard(force=false) {
-    if (!boardOpen()) return;
-    if (state.boardPending) {if (force) state.boardQueued=true;return;}
-    const origin=boardOrigin();if (!origin)return;
-    const system=state.system, generation=state.systemGeneration;
+    if(!boardOpen())return;
+    if(state.boardPending){state.boardQueued=true;return;}
+    const origin=boardOrigin();if(!origin)return;
+    const system=state.system,generation=state.systemGeneration;
     state.boardPending=true;
     const token=++state.boardSerial;
     try {
       const stops=await loadStopCatalog();
-      if (!boardOpen()||state.system!==system||state.systemGeneration!==generation||token!==state.boardSerial)return;
-      const ids=[...stops].sort((a,b)=>metersBetween(origin.lat,origin.lon,a.lat,a.lon)-metersBetween(origin.lat,origin.lon,b.lat,b.lon))
-        .slice(0,3).map(s=>s.id);
-      if (!ids.length) {state.boardPayload=null;renderNearbyBoard();return;}
-      if (!force && state.boardAt?.system===system && ids.join('|')===state.boardAt.ids.join('|') &&
-          Date.now()-state.boardLastFetch<45000) {renderNearbyBoard();return;}
-      state.boardAt={system,ids};state.boardPayload=null;
-      renderNearbyBoard();
+      if(!boardOpen()||state.system!==system||state.systemGeneration!==generation||token!==state.boardSerial)return;
+      const ids=stops.map(stop=>({id:stop.id,d:metersBetween(origin.lat,origin.lon,stop.lat,stop.lon)}))
+        .sort((a,b)=>a.d-b.d).slice(0,10).map(row=>row.id);
+      if(!ids.length){state.boardPayload=null;renderNearbyBoard();return;}
+      if(!force && state.boardAt?.system===system && ids.join('|')===state.boardAt.ids.join('|') &&
+        Date.now()-state.boardLastFetch<45000){renderNearbyBoard();return;}
+      state.boardAt={system,ids};state.boardPayload=null;renderNearbyBoard();
       const url=apiPath('nearby-departures')+ids.map(id=>'&stop_id='+encodeURIComponent(id)).join('');
-      const resp=await fetch(url,{cache:'no-store'});
-      if (!resp.ok)throw new Error('Departure feed unavailable');
-      const data=await resp.json();
-      if (!boardOpen()||state.system!==system||state.systemGeneration!==generation||token!==state.boardSerial)return;
+      const response=await fetch(url,{cache:'no-store'});
+      if(!response.ok)throw new Error('Departure feed unavailable');
+      const data=await response.json();
+      if(!boardOpen()||state.system!==system||state.systemGeneration!==generation||token!==state.boardSerial)return;
       state.boardPayload=data;state.boardLastFetch=Date.now();renderNearbyBoard();
-    } catch(err) {
-      if (system===state.system && token===state.boardSerial) $('boardResults').textContent=err?.message||'Unable to load nearby departures';
-    } finally {
+    }catch(err){
+      if(system===state.system&&token===state.boardSerial)$('boardResults').textContent=err?.message||'Unable to load nearby routes';
+    }finally{
       if(token===state.boardSerial){
         state.boardPending=false;
         if(state.boardQueued){state.boardQueued=false;refreshNearbyBoard(true);}
       }
     }
   }
-  function updateBoardFromVehicles() { if(boardOpen() && state.boardPayload)renderNearbyBoard(); }
+  function updateBoardFromVehicles(){if(boardOpen()&&state.boardPayload)renderNearbyBoard();}
   function renderNearby(keepHint=false){
     if(!state.userLocation)return;
     const point=state.userLocation;
@@ -1773,6 +1974,99 @@
       row.append(name,status);node.append(row);
     }
   }
+  function saveCustomization(){
+    try{localStorage.setItem('bct_v34_customization',JSON.stringify(state.customization));}catch(_){}
+  }
+  function applyCustomization(save=true){
+    const c=state.customization;
+    const choice=c.accent==='custom'&&/^#[0-9a-fA-F]{6}$/.test(c.customColor)?c.customColor:
+      (ACCENT_PRESETS[c.accent]||ACCENT_PRESETS.blue);
+    document.documentElement.dataset.v34Accent=c.accent;
+    document.documentElement.dataset.v34Anim=c.animations;
+    document.documentElement.dataset.v34Crosshair=c.crosshair;
+    document.documentElement.dataset.v34Text=c.textSize;
+    document.documentElement.style.setProperty('--v34-accent',choice);
+    document.documentElement.style.setProperty('--v34-accent-soft',choice+'20');
+    $('nextTripMapToggle').checked=c.nextTrip;
+    if(save)saveCustomization();
+    syncSettingsControls();
+  }
+  function syncSettingsControls(){
+    const c=state.customization;
+    const update=(id,value,checked=false)=>{const el=$(id);if(el){if(checked)el.checked=Boolean(value);else el.value=value;}};
+    update('v34Theme',state.theme);
+    update('v34TextSize',c.textSize);
+    update('v34Animation',c.animations);
+    update('v34Crosshair',c.crosshair);
+    update('v34CustomColour',c.accent==='custom'?c.customColor:ACCENT_PRESETS[c.accent]||ACCENT_PRESETS.blue);
+    update('v34MarkerSize',state.markerSize);
+    update('v34Density',state.density);
+    update('v34RouteColors',state.routeColors,true);
+    update('v34SmoothMotion',state.motionEnabled,true);
+    update('v34NextTrip',c.nextTrip,true);
+    update('v34Lite',state.lite,true);
+    update('v34DataSaver',state.lowBandwidth,true);
+    update('v34Hover',c.hoverPreview,true);
+    update('v34Tap',c.tapPreview,true);
+    document.querySelectorAll('#v34AccentSwatches [data-accent]').forEach(el=>{
+      el.setAttribute('aria-pressed',String(el.dataset.accent===c.accent));
+    });
+  }
+  function bindSettings(){
+    const dialog=$('v34Settings');
+    $('settingsOpen').addEventListener('click',()=>{syncSettingsControls();if(!dialog.open)dialog.showModal();});
+    $('settingsClose').addEventListener('click',()=>dialog.close());
+    $('v34DoneSettings').addEventListener('click',()=>dialog.close());
+    dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close();});
+    $('v34Theme').addEventListener('change',event=>setTheme(event.target.value));
+    const pick=(id,key,allowed)=>$(id).addEventListener('change',event=>{
+      if(!allowed.includes(event.target.value))return;
+      state.customization[key]=event.target.value;applyCustomization();
+    });
+    pick('v34TextSize','textSize',['normal','large','xlarge']);
+    pick('v34Animation','animations',['none','subtle','full']);
+    pick('v34Crosshair','crosshair',['off','subtle','strong']);
+    document.querySelectorAll('#v34AccentSwatches [data-accent]').forEach(el=>el.addEventListener('click',()=>{
+      state.customization.accent=el.dataset.accent;applyCustomization();
+    }));
+    $('v34CustomColour').addEventListener('input',event=>{
+      const color=event.target.value;if(!/^#[0-9a-fA-F]{6}$/.test(color))return;
+      state.customization.accent='custom';state.customization.customColor=color;applyCustomization();
+    });
+    $('v34MarkerSize').addEventListener('change',event=>{
+      if(!['small','normal','large'].includes(event.target.value))return;
+      state.markerSize=event.target.value;savePreferences();applyPreferences();
+    });
+    $('v34Density').addEventListener('change',event=>{
+      if(!['compact','comfortable'].includes(event.target.value))return;
+      state.density=event.target.value;savePreferences();applyPreferences();
+    });
+    $('v34RouteColors').addEventListener('change',event=>{
+      state.routeColors=event.target.checked;savePreferences();applyPreferences();
+      if(state.selected){const v=state.vehicles.find(v=>v.id===state.selected);if(v)loadSelectedRoute(v);}
+    });
+    $('v34SmoothMotion').addEventListener('change',event=>{
+      state.motionEnabled=event.target.checked;savePreferences();applyPreferences();updateSelectedMotion();
+    });
+    $('v34NextTrip').addEventListener('change',event=>{
+      state.customization.nextTrip=event.target.checked;applyCustomization();
+      const v=state.vehicles.find(v=>v.id===state.selected);if(v)refreshNextTripOverlay(v,true);
+    });
+    $('v34Lite').addEventListener('change',event=>{setLite(event.target.checked);syncSettingsControls();});
+    $('v34DataSaver').addEventListener('change',event=>{
+      state.lowBandwidth=event.target.checked;savePreferences();applyPreferences();renderStatus();
+    });
+    for(const [id,key] of [['v34Hover','hoverPreview'],['v34Tap','tapPreview']]) {
+      $(id).addEventListener('change',event=>{state.customization[key]=event.target.checked;applyCustomization();});
+    }
+    $('v34ResetSettings').addEventListener('click',()=>{
+      // Reset interface choices ONLY, not favourites, visited places or history.
+      state.customization={...DEFAULT_CUSTOMIZATION};state.markerSize='normal';state.density='comfortable';
+      state.routeColors=true;state.motionEnabled=true;state.lowBandwidth=false;
+      setTheme('classic');setLite(mobile());savePreferences();applyPreferences();applyCustomization();
+      const v=state.vehicles.find(v=>v.id===state.selected);if(v)refreshNextTripOverlay(v,true);
+    });
+  }
   function applyPreferences() {
     document.documentElement.dataset.density = state.density;
     document.documentElement.dataset.markerSize = state.markerSize;
@@ -1781,16 +2075,18 @@
     $('markerSizeSelect').value = state.markerSize;
     $('routeColorsToggle').checked = state.routeColors;
     $('lowBandwidthToggle').checked = state.lowBandwidth;
+    $('smoothMotionToggle').checked = state.motionEnabled;
     $('sortSelect').value=state.sortBy;
     $('serviceFilter').value=state.serviceFilter;
     $('modelSelect').value=state.modelFilter;
+    if($('v34MarkerSize')) syncSettingsControls();
     lastListSignature = ''; renderList(); renderMap();
   }
   function savePreferences() {
     try {localStorage.setItem('bct_ui_preferences_v28', JSON.stringify({
       density:state.density, markerSize:state.markerSize, routeColors:state.routeColors,
       groupMode:state.groupMode,sortBy:state.sortBy,
-      serviceFilter:state.serviceFilter,modelFilter:state.modelFilter,lowBandwidth:state.lowBandwidth
+      serviceFilter:state.serviceFilter,modelFilter:state.modelFilter,lowBandwidth:state.lowBandwidth,motionEnabled:state.motionEnabled
     }));} catch (_) {}
   }
   function switchSystem(value) {
@@ -1803,12 +2099,15 @@
     if(state.pendingShare?.system!==value)state.pendingShare=null;
     state.following=false; state.requestPending=false;
     state.vehicles=[]; state.data=null; state.clientError=null; state.restoredCache=false;
+    state.motionTracks.clear();
     state.expandedGroups.clear(); state.needsListRefresh=false;
     state.userLocation=null;state.pendingNearestSort=false;clearLocationMarker();
     if (state.nearbyStopMarker) {state.nearbyStopMarker.remove();state.nearbyStopMarker=null;}
     $('nearbySection').hidden=true;$('locateButton').setAttribute('aria-pressed','false');
     state.nearbyStopToken++;
     state.boardSerial++;state.boardPending=false;state.boardQueued=false;state.boardPayload=null;state.boardAt=null;state.boardLastFetch=0;
+    state.boardPointer=null;state.boardPointerMode=null;state.boardPointerMarker?.remove();state.boardPointerMarker=null;
+    state.nextTripRequestSerial++;state.nextTripOverlayKey=null;state.nextRouteLayer?.clearLayers();$('nextTripLegend').hidden=true;
     state.markers.forEach(r=>r.marker.remove()); state.markers.clear();
     if (state.routeLayer) state.routeLayer.clearLayers();
     state.routeTrip=null; state.routeDetail=null; state.routeMetadataStamp=null;
@@ -1886,6 +2185,13 @@
     $('markerSizeSelect').addEventListener('change', (ev) => {
       state.markerSize=ev.target.value; savePreferences(); applyPreferences();
     });
+    $('smoothMotionToggle').addEventListener('change',ev=>{
+      state.motionEnabled=ev.target.checked;savePreferences();syncSettingsControls();updateSelectedMotion();
+    });
+    $('nextTripMapToggle').addEventListener('change',()=>{
+      state.customization.nextTrip=$('nextTripMapToggle').checked;applyCustomization();
+      const v=state.vehicles.find(x=>x.id===state.selected);if(v)refreshNextTripOverlay(v,true);
+    });
     $('lowBandwidthToggle').addEventListener('change', (ev) => {
       state.lowBandwidth=ev.target.checked;savePreferences();renderStatus();
     });
@@ -1911,8 +2217,27 @@
     $('shareVehicleButton').addEventListener('click',shareSelectedBus);
     $('alertsMainSection').addEventListener('toggle',ev=>{if(ev.target.open)loadAlerts('alertsMainContent');});
     $('alertsDetailSection').addEventListener('toggle',ev=>{if(ev.target.open){const v=state.vehicles.find(v=>v.id===state.selected);if(v)loadAlerts('alertsDetailContent',v);}});
-    $('nearbyBoard').addEventListener('toggle',()=>{if(boardOpen()){if(mobile())setSidebar(false);refreshNearbyBoard(true);}});
+    $('nearbyBoard').addEventListener('toggle',()=>{if(boardOpen()){if(mobile())setSidebar(false);refreshNearbyBoard(true);}else{state.boardPointerMarker?.remove();state.boardPointerMarker=null;state.boardPointer=null;state.boardPointerMode=null;}});
     $('boardRefresh').addEventListener('click',()=>refreshNearbyBoard(true));
+    $('boardLocate').addEventListener('click',clearBoardPoint);
+    // On Android, swipe the nearby sheet handle upward/downward to open/close.
+    // Preserve the standard summary tap and keyboard behaviour.
+    const boardHandle=$('nearbyBoard').querySelector('summary');
+    let boardTouchStart=null, suppressBoardClick=false;
+    boardHandle.addEventListener('touchstart',event=>{
+      boardTouchStart=event.touches.length===1?event.touches[0].clientY:null;
+    },{passive:true});
+    boardHandle.addEventListener('touchend',event=>{
+      if(boardTouchStart===null)return;
+      const delta=event.changedTouches[0].clientY-boardTouchStart;boardTouchStart=null;
+      if(Math.abs(delta)<35)return;
+      event.preventDefault();suppressBoardClick=true;
+      $('nearbyBoard').open=delta<0;
+    },{passive:false});
+    boardHandle.addEventListener('click',event=>{
+      if(suppressBoardClick){event.preventDefault();suppressBoardClick=false;}
+    });
+
     $('locateButton').addEventListener('click',startLocation);
     $('locationStop').addEventListener('click',stopLocation);
     $('checkSystemHealth').addEventListener('click',checkSystemHealth);
@@ -2006,16 +2331,27 @@
       const normalizedModelFilter = oldNovaFilter[prefs.modelFilter] || prefs.modelFilter;
       if (['all',...MODEL_ASSETS].includes(normalizedModelFilter)) state.modelFilter=normalizedModelFilter;
       if (typeof prefs.lowBandwidth==='boolean') state.lowBandwidth=prefs.lowBandwidth;
+      if (typeof prefs.motionEnabled==='boolean') state.motionEnabled=prefs.motionEnabled;
       // Location consent is not persisted; never imply a nearest sort without GPS.
       if(state.sortBy==='nearest')state.sortBy='route';
       $('groupMode').value=state.groupMode;
     } catch (_) {}
+    try {
+      const saved=JSON.parse(localStorage.getItem('bct_v34_customization')||'{}');
+      if(['blue','teal','green','orange','purple','rose','custom'].includes(saved.accent))state.customization.accent=saved.accent;
+      if(/^#[0-9a-fA-F]{6}$/.test(saved.customColor))state.customization.customColor=saved.customColor;
+      if(['none','subtle','full'].includes(saved.animations))state.customization.animations=saved.animations;
+      if(['off','subtle','strong'].includes(saved.crosshair))state.customization.crosshair=saved.crosshair;
+      if(['normal','large','xlarge'].includes(saved.textSize))state.customization.textSize=saved.textSize;
+      for(const key of ['hoverPreview','tapPreview','nextTrip'])if(typeof saved[key]==='boolean')state.customization[key]=saved[key];
+    }catch(_){}
     try { setTheme(localStorage.getItem('bct_theme') || 'classic', false); } catch (_) {setTheme('classic',false);}
     try {state.query=(localStorage.getItem(filterKey()) || (state.system==='victoria' ? localStorage.getItem('bct_route_filter') : '') || '').slice(0,12);} catch (_) {}
     try {state.lite=localStorage.getItem('bct_mobile_lite')===null ? mobile() : localStorage.getItem('bct_mobile_lite')==='true';} catch (_) {state.lite=mobile();}
     setLite(state.lite, false);
+    applyCustomization(false);
     readFavorites(); renderFavorites();
-    renderQuickRoutes(); bindControls(); initMap(); setFilter(state.query); applyPreferences(); updateMobileOpenLabel();
+    renderQuickRoutes(); bindControls(); bindSettings(); initMap(); setFilter(state.query); applyPreferences(); updateMobileOpenLabel();
     try {
       const cached = JSON.parse(sessionStorage.getItem(snapshotKey()) || 'null');
       if (cached && Date.now()-cached.savedAt < 120000 && cached.data) applyData(cached.data,true);
@@ -2032,8 +2368,9 @@
     }, CLIENT_REFRESH_MS);
     setInterval(() => { if (document.visibilityState === 'visible') renderStatus(); }, 5000);
     setInterval(() => {if(document.visibilityState==='visible' && boardOpen())refreshNearbyBoard();},45000);
-    // Visual-only cycling: does not request extra GPS, map tiles, or history.
-    setInterval(refreshUnverifiedNovaArtwork, 500);
+    // Visual-only selected-bus motion; never increases upstream GPS requests.
+    // 10 frames/sec is enough for a one-marker glide and is cheap on Android.
+    setInterval(updateSelectedMotion, 100);
     setInterval(() => { if (document.visibilityState === 'visible' && state.selected && (!state.lowBandwidth || Date.now()-state.lastArrivalRefreshAt>=60000)) refreshSelectedArrivals(); }, 20000);
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') { loadVehicles(); if (state.selected) refreshSelectedArrivals(); }

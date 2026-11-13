@@ -27,11 +27,14 @@
   <link rel="stylesheet" href="/v30rc.css?v=3.0" />
   <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script defer src="/config.js"></script>
-  <script defer src="/app.js?v=3.2.0"></script>
-  <script defer src="/pwa.js?v=3.2.0"></script>
+  <script defer src="/motion.js?v=3.4.0"></script>
+  <script defer src="/app.js?v=3.4.1"></script>
+  <script defer src="/pwa.js?v=3.4.0"></script>
   <link rel="stylesheet" href="/v307.css?v=3.0.7" />
   <link rel="stylesheet" href="/v31.css?v=3.1.0" />
   <link rel="stylesheet" href="/v32.css?v=3.2.0" />
+  <link rel="stylesheet" href="/v33.css?v=3.3.0" />
+  <link rel="stylesheet" href="/v34.css?v=3.4.1" />
 </head>
 <body>
   <div class="app-shell">
@@ -45,7 +48,7 @@
               <path d="M8 15h16M11 24v4m10-4v4" /><circle cx="11" cy="19" r="1" fill="currentColor"/><circle cx="21" cy="19" r="1" fill="currentColor"/><path d="M13 9h6" />
             </svg>
           </div>
-          <div class="brand-text"><span class="brand-kicker"><span id="regionName">GREATER VICTORIA</span></span><h1>BUS<span>RADAR</span><span class="version">V3.2</span></h1></div>
+          <div class="brand-text"><span class="brand-kicker"><span id="regionName">GREATER VICTORIA</span></span><h1>BUS<span>RADAR</span><span class="version">V3.4.1</span></h1></div>
           <button id="sidebarClose" class="icon-button sidebar-close" aria-label="Hide sidebar" title="Hide sidebar">✕</button>
         </div>
       </div>
@@ -108,17 +111,20 @@
             <option value="nova_gen2">NovaBus LFS Gen 2</option>
             <option value="nova_gen3">NovaBus LFS Gen 3</option>
             <option value="nova_gen4">NovaBus LFS Gen 4</option>
+            <option value="nova_lfse">NovaBus LFSe+ electric</option>
+            <option value="light_duty">Light-duty / community bus</option>
             <option value="xn40">New Flyer XN40</option>
             <option value="xe40">New Flyer XE40</option>
             <option value="enviro500">Enviro500</option>
             <option value="enviro500mmc">Enviro500 MMC</option>
             <option value="generic">Other / unknown</option>
           </select>
-          <p class="fleet-gallery-link"><a href="/fleet-gallery.html" target="_blank" rel="noopener noreferrer">View all 10 supplied bus drawings</a></p>
+          <p class="fleet-gallery-link"><a href="/fleet-gallery.html" target="_blank" rel="noopener noreferrer">Fleet illustration gallery</a></p>
           <label for="densitySelect">Sidebar spacing</label><select id="densitySelect"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select>
           <label for="markerSizeSelect">Bus label size</label><select id="markerSizeSelect"><option value="small">Small</option><option value="normal">Normal</option><option value="large">Large</option></select>
           <label class="preferences-checkbox"><input id="routeColorsToggle" type="checkbox" checked /> Use route colours</label>
           <label class="preferences-checkbox"><input id="lowBandwidthToggle" type="checkbox" /> Data saver: fewer browser checks</label>
+          <label class="preferences-checkbox"><input id="smoothMotionToggle" type="checkbox" checked /> Smooth selected bus marker (short estimate)</label>
           <div class="system-health"><div class="system-health-header"><strong>Feed status by region</strong><button id="checkSystemHealth" type="button" class="mini-button">Check</button></div><div id="systemHealthList">Check to see data freshness for all three systems.</div></div>
           <p>Saved on this device · Lite map is still available at the top.</p>
         </div>
@@ -137,6 +143,7 @@
           </div>
           <div class="fleet-art" id="fleetArt" hidden>
             <img id="detailBusImage" alt="Bus model drawing" width="192" height="90" decoding="async" loading="lazy" hidden />
+            <div id="fleetNoImage" class="fleet-no-image" role="img" aria-label="No vehicle illustration available" hidden>NO IMAGE</div>
             <label id="artworkPicker" class="artwork-picker" for="detailArtworkVariant" hidden>Drawing variant
               <select id="detailArtworkVariant" aria-label="Choose bus model drawing variant"></select>
             </label>
@@ -144,8 +151,13 @@
         </div>
         <div class="nova-smart-highlight" id="novaSmartSpecial" hidden>
           <strong>★ FLEET #9434 — SMART LFS PROTOTYPE</strong>
-          <span>A special 2012 NovaBus LFS in the Victoria fleet, documented with full-length roof fairings. Vehicle model confirmed by published fleet photographs; the profile uses a NovaBus reference illustration.</span>
+          <span>A special 2012 NovaBus LFS in the Victoria fleet, documented with full-length roof fairings. Vehicle model confirmed by published fleet photographs; the profile uses its dedicated Smart LFS illustration.</span>
         </div>
+        <details class="v33-amenities" id="amenitiesPanel">
+          <summary>ONBOARD AMENITIES</summary>
+          <div id="amenitiesList" class="v33-amenities-content"></div>
+          <small>Equipment varies by vehicle and retrofit. These details are not reported in live GPS.</small>
+        </details>
         <div class="v31-profile-actions">
           <button id="favoriteBusButton" class="secondary-button" type="button">☆ Save this bus</button>
           <button id="shareVehicleButton" class="secondary-button" type="button">Share bus</button>
@@ -154,6 +166,7 @@
         <button id="favoriteRouteButton" class="secondary-button favorite-route-button" type="button">☆ Save this route</button>
         <button id="followButton" class="primary-button">Follow vehicle: OFF</button>
         <button id="recenterButton" class="secondary-button">Center on this bus</button>
+        <p class="v33-motion-note" id="motionStatus">Bus markers show last reported GPS positions.</p>
         <div class="detail-grid compact-detail-grid" aria-label="Current vehicle information">
           <div><span>Feed vehicle ID</span><strong id="detailId">—</strong></div>
           <div><span>GPS updated</span><strong id="detailAge">—</strong></div>
@@ -176,6 +189,8 @@
         <details class="v2-panel collapsible-detail route-change-panel"><summary>NEXT SCHEDULED TRIP</summary>
           <strong class="run-title" id="detailRouteChange">Not determinable</strong>
           <p class="panel-status" id="detailRouteChangeNote">Needs a live trip and published GTFS block schedule.</p>
+          <label class="v33-overlay-check"><input id="nextTripMapToggle" type="checkbox" checked> Show next scheduled route as a dashed line</label>
+          <p class="panel-status" id="nextTripOverlayStatus">Scheduled next-trip lines are estimates, not confirmed vehicle assignments.</p>
         </details>
         <details class="v2-panel collapsible-detail proximity-panel"><summary>GPS / SCHEDULED ROUTE CHECK</summary>
           <strong class="proximity-status" id="detailProximityStatus">Cannot determine</strong>
@@ -236,6 +251,7 @@
 
     <main class="map-main" aria-label="BC Transit live bus map">
       <div id="map" aria-label="Interactive map of BC Transit buses"></div>
+      <div id="v34MapCentre" class="v34-map-centre" aria-hidden="true"><span class="v34-centre-dot"></span></div>
       <div id="mapUnavailable" class="map-unavailable" hidden>Map library unavailable. Check your internet connection and reload the page.</div>
 
       <div class="top-bar">
@@ -259,21 +275,25 @@
           <button id="themeToggle" class="top-button theme-toggle" type="button" title="Switch to dark map" aria-label="Switch to dark map" aria-pressed="true">
             <span class="theme-toggle-symbol" aria-hidden="true">☀</span><span class="theme-toggle-label">Light map</span>
           </button>
+          <button id="settingsOpen" class="top-button v34-settings-open" type="button" title="Customize Bus Radar" aria-label="Open display settings" aria-haspopup="dialog">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v3m0 12v3M3 12h3m12 0h3m-15.4-6.4 2.1 2.1m8.6 8.6 2.1 2.1m0-13.5-2.1 2.1M7.7 16.3l-2.1 2.1"/><circle cx="12" cy="12" r="4.1"/></svg>
+          </button>
           <button id="resetView" class="top-button reset-view" title="Reset view" aria-label="Reset map view">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M1 12h4m14 0h4"/></svg>
           </button>
         </div>
       </div>
 
-      <details class="v32-board" id="nearbyBoard" aria-label="Nearby stop departures">
-        <summary class="v32-board-toggle">◷ Nearby departures</summary>
+      <details class="v32-board v33-board" id="nearbyBoard" aria-label="Nearby route departures">
+        <summary class="v32-board-toggle"><span class="v33-drag-handle" aria-hidden="true"></span><span>◷ Nearby routes</span><span class="v33-board-caret" aria-hidden="true">⌃</span></summary>
         <div class="v32-board-body">
-          <div class="v32-board-heading"><strong>Departures and nearby buses</strong><button id="boardRefresh" type="button" title="Refresh departures" aria-label="Refresh nearby departures">↻</button></div>
-          <p class="v32-board-hint" id="boardHint">Open to find departures around the map centre.</p>
+          <div class="v32-board-heading"><strong>Upcoming routes</strong><div class="v33-board-actions"><button id="boardLocate" type="button" title="Return to your location or map centre" aria-label="Use my location or map centre">◎</button><button id="boardRefresh" type="button" title="Refresh departures" aria-label="Refresh nearby routes">↻</button></div></div>
+          <p class="v32-board-hint" id="boardHint">Open to see routes departing near your location or map pointer.</p>
           <div class="v32-board-results" id="boardResults" aria-live="polite"></div>
-          <small class="v32-board-note">Live = fresh predicted time · Sched = published timetable. Closest bus stops are based on distance, not confirmed route service.</small>
+          <small class="v32-board-note">Live = fresh trip prediction · Sched = published timetable. Swipe a route sideways to change destination. On desktop, hover over the map to inspect a different area; on phones, tap the map. A nearby route may depart from a stop a short walk away.</small>
         </div>
       </details>
+      <div id="nextTripLegend" class="v33-next-legend" hidden aria-label="Next scheduled route map legend">┄ NEXT SCHEDULED ROUTE <small>Not a confirmed assignment</small></div>
       <button id="locateButton" class="locate-button" type="button" title="Show my location and nearby buses" aria-label="Show my location and nearby buses" aria-pressed="false">◎ <span>Near me</span></button>
       <button id="mobileOpen" class="mobile-open" type="button" aria-label="Show bus routes and search">☰ <span id="mobileOpenText">Routes</span></button>
       <div class="map-bottom">
@@ -283,6 +303,46 @@
       <div class="mobile-brand">BUS<span>RADAR</span></div>
     </main>
   </div>
+  <dialog id="v34Settings" class="v34-settings" aria-labelledby="v34SettingsTitle">
+    <div class="v34-settings-head">
+      <div><span class="v34-kicker">PERSONALIZE THE VIEW</span><h2 id="v34SettingsTitle">Bus Radar settings</h2><p>Saved only on this device. Live vehicle data stays unchanged.</p></div>
+      <button id="settingsClose" type="button" aria-label="Close settings" class="v34-close">✕</button>
+    </div>
+    <div class="v34-settings-scroll">
+      <section class="v34-settings-group" aria-label="Appearance settings">
+        <h3>Appearance</h3>
+        <label class="v34-field" for="v34Theme"><span>Map theme<small>Light or dark basemap and panels</small></span><select id="v34Theme"><option value="classic">Light</option><option value="dark">Dark</option></select></label>
+        <div class="v34-field v34-color-field"><span>Accent colour<small>Buttons, active states and highlights</small></span><div class="v34-swatches" id="v34AccentSwatches" role="group" aria-label="Accent colour presets">
+          <button type="button" data-accent="blue" style="--swatch:#1a73e8" aria-label="Blue"></button>
+          <button type="button" data-accent="teal" style="--swatch:#009688" aria-label="Teal"></button>
+          <button type="button" data-accent="green" style="--swatch:#29834c" aria-label="Green"></button>
+          <button type="button" data-accent="orange" style="--swatch:#c36a20" aria-label="Orange"></button>
+          <button type="button" data-accent="purple" style="--swatch:#7957c2" aria-label="Purple"></button>
+          <button type="button" data-accent="rose" style="--swatch:#bb4d7c" aria-label="Rose"></button>
+        </div></div>
+        <label class="v34-field" for="v34CustomColour"><span>Custom accent<small>Select any colour</small></span><input id="v34CustomColour" type="color" value="#1a73e8" aria-label="Custom accent colour"></label>
+        <label class="v34-field" for="v34TextSize"><span>Text size<small>Panels and nearby routes</small></span><select id="v34TextSize"><option value="normal">Normal</option><option value="large">Large</option><option value="xlarge">Extra large</option></select></label>
+        <label class="v34-field" for="v34Animation"><span>Transitions<small>Respects Android reduced-motion settings</small></span><select id="v34Animation"><option value="none">Off</option><option value="subtle">Subtle · recommended</option><option value="full">More animated</option></select></label>
+      </section>
+      <section class="v34-settings-group" aria-label="Map settings">
+        <h3>Map &amp; vehicles</h3>
+        <label class="v34-field" for="v34Crosshair"><span>Map centre marker<small>Shows where a map-centre search originates</small></span><select id="v34Crosshair"><option value="subtle">Small dot</option><option value="strong">Crosshair</option><option value="off">Hidden</option></select></label>
+        <label class="v34-field" for="v34MarkerSize"><span>Bus label size</span><select id="v34MarkerSize"><option value="small">Small</option><option value="normal">Normal</option><option value="large">Large</option></select></label>
+        <label class="v34-field" for="v34Density"><span>Sidebar spacing</span><select id="v34Density"><option value="compact">Compact</option><option value="comfortable">Comfortable</option></select></label>
+        <label class="v34-check"><input id="v34RouteColors" type="checkbox" checked><span>Colour route labels</span></label>
+        <label class="v34-check"><input id="v34SmoothMotion" type="checkbox" checked><span>Smooth the selected bus marker<small>Visual estimates only. Not actual new GPS reports.</small></span></label>
+        <label class="v34-check"><input id="v34NextTrip" type="checkbox" checked><span>Show next scheduled route by default<small>Dashed line, not a confirmed trip assignment</small></span></label>
+      </section>
+      <section class="v34-settings-group" aria-label="Performance and interaction settings">
+        <h3>Performance &amp; interaction</h3>
+        <label class="v34-check"><input id="v34Lite" type="checkbox"><span>Lite map mode<small>Less map rendering on slower phones</small></span></label>
+        <label class="v34-check"><input id="v34DataSaver" type="checkbox"><span>Data saver<small>Fewer checks of the server cache</small></span></label>
+        <label class="v34-check"><input id="v34Hover" type="checkbox" checked><span>Desktop hover previews nearby routes<small>Only while the departures panel is open</small></span></label>
+        <label class="v34-check"><input id="v34Tap" type="checkbox" checked><span>Tap the map to inspect nearby routes<small>Useful for Android and touchscreens</small></span></label>
+      </section>
+      <div class="v34-settings-foot"><button type="button" id="v34ResetSettings">Restore display defaults</button><button type="button" id="v34DoneSettings">Done</button></div>
+    </div>
+  </dialog>
   <dialog id="locationConsent" class="location-consent" aria-labelledby="locationConsentTitle">
     <h2 id="locationConsentTitle">Show your location?</h2>
     <p>Bus Radar will ask your browser for location access. Your precise position stays in this browser and is used to find nearby buses and stops. It is not sent to the Bus Radar server.</p>

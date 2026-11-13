@@ -73,7 +73,7 @@ STATIC_PARSE_LOCK = threading.Lock()
 MAX_FEED_BYTES = 12 * 1024 * 1024
 MAX_ZIP_BYTES = 85 * 1024 * 1024
 REQUEST_TIMEOUT = 16
-USER_AGENT = "BCTransitBusRadar/3.1 (unofficial public transit map)"
+USER_AGENT = "BCTransitBusRadar/3.3 (unofficial public transit map)"
 TIMEZONE = ZoneInfo("America/Vancouver")
 
 OFF_ROUTE_THRESHOLD_M = 100  # user-selected heuristic; route detours / GPS noise can trigger off-route warnings
@@ -888,7 +888,7 @@ class Tracker:
         Stop IDs (not browser coordinates) are the only location-related input.
         No static index or expensive timetable scan is needed until requested.
         """
-        ids = list(dict.fromkeys(str(s) for s in stop_ids if s))[:4]
+        ids = list(dict.fromkeys(str(s) for s in stop_ids if s))[:10]
         now_ts = int(time.time()) if now_ts is None else int(now_ts)
         now = datetime.fromtimestamp(now_ts, TIMEZONE)
         start_window, end_window = now_ts - 60, now_ts + 5400
@@ -1155,8 +1155,8 @@ class Handler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/nearby-departures":
             params = urllib.parse.parse_qs(parsed.query)
             requested = params.get('stop_id', [])
-            if not requested or len(requested) > 4 or any(not sid or len(sid)>128 for sid in requested):
-                self._json({'error':'Provide up to four valid stop IDs'},400)
+            if not requested or len(requested) > 10 or any(not sid or len(sid)>128 for sid in requested):
+                self._json({'error':'Provide up to ten valid stop IDs'},400)
             else:
                 self._json(tracker.nearby_departures(requested))
             return
@@ -1263,7 +1263,7 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 def run() -> None:
-    parser = argparse.ArgumentParser(description="BC Transit Bus Radar V3.1 (multi-system web + Android PWA)")
+    parser = argparse.ArgumentParser(description="BC Transit Bus Radar V3.3 (multi-system web + Android PWA)")
     parser.add_argument("--host", default="127.0.0.1", help="Bind address; use 0.0.0.0 only behind a trusted host")
     parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", "8765")))
     parser.add_argument("--no-browser", action="store_true")
@@ -1292,7 +1292,7 @@ def run() -> None:
         threading.Thread(target=_trip_worker, args=(tracker,), daemon=True).start()
         threading.Thread(target=_static_worker, args=(tracker,), daemon=True).start()
     url = f"http://127.0.0.1:{args.port}"
-    print(f"\nBC Transit Bus Radar V3.2 — serving on {args.host}:{args.port}\n"
+    print(f"\nBC Transit Bus Radar V3.3 — serving on {args.host}:{args.port}\n"
           f"Local URL: {url}\nPress Ctrl+C to stop.\n")
     if not args.no_browser:
         threading.Timer(0.6, lambda: webbrowser.open(url)).start()

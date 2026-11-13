@@ -1,0 +1,71 @@
+/* V3.3: route-first nearby bottom sheet, map pointer crosshair and lightweight vehicle profile details. */
+.v33-amenities{margin:8px 0;border:1px solid var(--line);border-radius:4px;background:var(--panel)}
+.v33-amenities>summary{cursor:pointer;min-height:42px;padding:11px;font-size:11px;font-weight:700;letter-spacing:.02em}
+.v33-amenities-content{display:grid;gap:7px;padding:0 10px 8px}
+.v33-amenity{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 7px;padding:5px 0;border-top:1px solid var(--line);font-size:11px;overflow-wrap:anywhere}
+.v33-amenity strong{font-weight:700}.v33-amenity small{font-size:9px;color:var(--muted)}
+.v33-amenity small.confirmed{color:#168756}.v33-amenity span{grid-column:1/-1;color:var(--muted);line-height:1.45}
+.v33-amenities>small{display:block;margin:0 10px 10px;color:var(--muted);font-size:10px}
+.v33-overlay-check{display:flex;align-items:center;gap:7px;padding:6px 8px;font-size:11px;line-height:1.4;cursor:pointer}
+.v33-overlay-check input{width:17px;height:17px;flex-shrink:0}
+.v33-motion-note{font-size:10px;line-height:1.4;color:var(--muted);padding:4px 0;margin:2px 0 9px}
+.v33-board .v32-board-heading{position:sticky;top:0;z-index:1;background:var(--panel)}
+.v33-board .v32-board-heading button{min-height:38px;min-width:38px}
+.v33-board-actions{display:flex;gap:6px}
+.v33-drag-handle{display:none}
+.v33-board-caret{margin-left:auto;color:var(--muted);font-size:16px;line-height:1}
+.v33-board[open] .v33-board-caret{transform:rotate(180deg)}
+.v33-route-card{padding:9px 5px 10px;border-bottom:1px solid var(--line);min-width:0}
+.v33-route-header{display:grid;grid-template-columns:46px minmax(0,1fr) 48px;align-items:center;gap:8px}
+.v33-route-badge{font-size:14px;font-weight:700;padding:5px 3px;text-align:center;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--text)}
+.v33-direction-wrap{overflow:hidden;min-width:0}.v33-direction-label{display:block;font-weight:700;font-size:12px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.v33-next-eta{text-align:right;font-size:14px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.v33-directions{display:flex;gap:6px;overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior-inline:contain;scrollbar-width:thin;padding:8px 0 7px 54px}
+.v33-dir-choice{border:1px solid var(--line);border-radius:12px;background:transparent;color:var(--text);font:11px/1.3 Arial,Helvetica,sans-serif;padding:6px 10px;min-height:33px;min-width:80px;flex-shrink:0;max-width:220px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;scroll-snap-align:start;cursor:pointer}
+.v33-dir-choice.active{background:var(--bg);border-color:#1982d2;font-weight:700}
+.v33-route-times{display:flex;align-items:center;gap:5px;margin:7px 0 4px 54px;flex-wrap:wrap;font-variant-numeric:tabular-nums}
+.v33-time{font-size:11px;border:1px solid var(--line);background:var(--bg);padding:4px 6px;border-radius:3px;color:var(--muted);white-space:nowrap}
+.v33-time.live{color:#168756;border-color:#279463}
+.v33-boarding{display:block;margin:5px 0 0 54px;color:var(--muted);font-size:10px;line-height:1.3;overflow-wrap:anywhere}
+.v33-board .v32-board-hint{font-size:11px;line-height:1.45}
+.v33-board .v32-board-results>p{padding:9px 2px}
+.v33-map-crosshair{pointer-events:none}
+@media(max-width:720px){
+ /* A thumb-friendly Transit-like expandable lower sheet, always above the map route controls. */
+ .v33-board{position:absolute;left:0!important;right:0!important;width:100%!important;bottom:max(60px,env(safe-area-inset-bottom,0px))!important;max-height:min(73dvh,660px)!important;border-radius:13px 13px 0 0;box-shadow:0 -3px 18px #0003;z-index:620}
+ .v33-board[open]{height:min(69dvh,570px)!important;max-height:min(69dvh,570px)!important}
+ .v33-board>summary{position:relative;min-height:51px!important;padding:15px 16px 9px!important;font-size:13px}
+ .v33-board .v33-drag-handle{display:block;position:absolute;width:38px;height:4px;left:calc(50% - 19px);top:5px;background:var(--muted);opacity:.55;border-radius:4px}
+ .v33-board .v32-board-body{height:calc(100% - 51px);max-height:calc(100% - 51px)!important;overflow-y:auto;padding:0 13px 18px}
+ .v33-board .v32-board-heading button{min-width:44px;min-height:44px}
+ .v33-route-card{padding:10px 0 12px}
+ .v33-route-header{grid-template-columns:48px minmax(0,1fr) 58px;gap:9px}
+ .v33-route-badge{font-size:15px;min-height:36px;display:grid;place-items:center}
+ .v33-next-eta{font-size:15px}
+ .v33-direction-label{font-size:12px}
+ .v33-directions{padding-left:57px;gap:7px}
+ .v33-dir-choice{min-height:44px;font-size:12px;border-radius:12px}
+ .v33-route-times,.v33-boarding{margin-left:57px}
+ .v33-time{padding:7px 9px;font-size:12px}
+ .v33-amenities>summary{min-height:46px}
+ .v33-overlay-check{min-height:44px}
+ .v33-board .v32-board-note{font-size:10px}
+}
+@media(max-width:375px){.v33-board .v32-board-body{padding-left:9px;padding-right:9px}}
+
+.v33-next-legend{position:absolute;z-index:610;right:12px;bottom:115px;max-width:210px;pointer-events:none;border:1px dashed #3885d1;border-radius:4px;background:var(--panel);color:var(--text);font:bold 10px/1.4 Arial,sans-serif;padding:7px 9px;box-shadow:0 1px 8px #0002}
+.v33-next-legend small{font-weight:normal;display:block;color:var(--muted);font-size:10px}
+@media(max-width:720px){.v33-next-legend{bottom:max(150px,env(safe-area-inset-bottom,0px) + 125px);right:8px;max-width:160px}}
+/* Prevent browsers from scrolling the entire map when focusing controls inside
+   the sheet; only the sheet content itself may scroll. */
+@media(max-width:720px){
+ .app-shell{position:fixed;inset:0;width:100%;height:100dvh;overflow:hidden}
+}
+@media(max-width:720px){
+ /* The earlier translateY(100%) offscreen sidebar expanded the app shell's
+    scrollable overflow area. Focusable direction tabs could scroll the entire
+    fixed map out of view. Fade the closed sidebar instead of moving it below
+    the viewport; this keeps the map shell's scrollTop at zero. */
+ body.sidebar-hidden .sidebar{transform:none!important;visibility:hidden;opacity:0;pointer-events:none;transition:opacity .15s ease,visibility 0s linear .15s!important}
+ body:not(.sidebar-hidden) .sidebar{transform:none!important;visibility:visible;opacity:1;transition:opacity .15s ease!important}
+}

@@ -61,7 +61,41 @@ VICTORIA_FLEET_SERIES: tuple[tuple[int,int,str,str,str], ...] = (
     (9501, 9531, 'enviro500', 'Alexander Dennis Enviro500', 'Victoria 2008 and demonstrator series'),
     (9532, 9589, 'enviro500mmc', 'Alexander Dennis Enviro500 MMC', 'Victoria 2020–26 MMC series'),
 )
-MODEL_IMAGES = frozenset({'xn40','xe40','vicinity30','nova2','nova3','enviro500','enviro500mmc','generic'})
+# Kelowna/Chilliwack are separate regional feeds. These are model-series ranges,
+# NOT proof that every vehicle is still assigned to that system.
+# The Kelowna 70xx family is provisional: Nova electric buses are confirmed in
+# the system, but a per-number manufacturer roster has not been independently verified.
+REGIONAL_FLEET_SERIES: dict[str, tuple[tuple[int,int,str,str,str], ...]] = {
+    'kelowna': (
+        (2800, 2999, 'light_duty', 'Light-duty community bus (exact model unverified)', 'Small bus / ARBOC-family candidate; NO IMAGE until individually verified'),
+        (6000, 6029, 'nova3', 'NovaBus LFS Gen 4 (2017)', '2017 LFS series; existing raised-rear drawing used as a reference'),
+        (7000, 7039, 'nova_lfse', 'NovaBus LFSe+ (likely electric 70xx series)', 'Provisional 70xx identification; Nova electric buses confirmed in Kelowna, specific vehicle roster unverified'),
+        (9232, 9318, 'nova2', 'NovaBus LFS Gen 2 (2007–2008)', '2007–08 LFS series; existing Gen 2 reference drawing'),
+        (9319, 9433, 'nova3', 'NovaBus LFS Gen 3 (2009)', '2009 T-drive LFS series; raised-rear reference drawing only'),
+        (9435, 9486, 'nova3', 'NovaBus LFS Gen 4 (2013–2015)', 'Later NovaBus LFS series; raised-rear reference illustration'),
+    ),
+    'chilliwack': (
+        (2800, 2999, 'light_duty', 'Light-duty community bus (exact model unverified)', 'Small bus family; NO IMAGE until individually verified'),
+        (9201, 9318, 'nova2', 'NovaBus LFS Gen 2', 'Early 2006–08 LFS series; allocation may vary across Fraser Valley'),
+        (9319, 9433, 'nova3', 'NovaBus LFS Gen 3 (2009)', '2009 LFS series; allocation may vary across Fraser Valley'),
+        (9435, 9486, 'nova3', 'NovaBus LFS Gen 4 (2013–2015)', 'Later LFS series; allocation may vary across Fraser Valley and FVX'),
+    ),
+}
+MODEL_IMAGES = frozenset({'xn40','xe40','vicinity30','nova2','nova3','nova_lfse','light_duty','enviro500','enviro500mmc','generic'})
+
+
+def regional_series_for(system_id: str, fleet_number: str) -> dict[str, str] | None:
+    if not FOUR_DIGITS.fullmatch(fleet_number):
+        return None
+    n = int(fleet_number)
+    for low, high, key, name, note in REGIONAL_FLEET_SERIES.get(system_id, ()):
+        if low <= n <= high:
+            series = {'model_key': key, 'model': name, 'series_note': note}
+            if key == 'nova2': series['nova_generation'] = 2
+            elif key == 'nova3': series['nova_generation'] = 4 if (n >= 9435 or 6000 <= n <= 6029) else 3
+            return series
+    return None
+
 
 # Only the fixed prefix explicitly seen in the user's Victoria live snapshot.
 # We do NOT suffix-strip arbitrary numeric labels from other agencies.
@@ -91,30 +125,30 @@ def identify_vehicle(system_id: str, label: Any) -> dict[str, Any]:
     result = {'fleet_number': None, 'fleet_status': 'unavailable',
               'fleet_basis': None, 'model_key': 'generic', 'model': None,
               'model_basis': None}
-    if system_id != 'victoria' or not isinstance(label, str):
+    if system_id not in ('victoria', 'kelowna', 'chilliwack') or not isinstance(label, str):
         return result
     clean = label.strip()
     match = VICTORIA_FEED_LABEL.fullmatch(clean)
-    # Four digits supplied as an explicit GTFS label are a stronger signal than
-    # a suffix, but still not independently verified against a painted fleet ID.
     direct = FOUR_DIGITS.fullmatch(clean)
+    # Only use the previously observed BC Transit label prefix for number
+    # identification when the candidate is also in this region's known series.
+    # Do not strip arbitrary prefixes or derive fleet numbers from trip IDs.
     candidate = match.group(1) if match else clean if direct else None
     if not candidate:
         return result
-    series = series_for(candidate)
+    series = series_for(candidate) if system_id == 'victoria' else regional_series_for(system_id, candidate)
     if series is None:
-        # Unknown number? Do NOT claim a fleet identity from an arbitrary suffix.
         return result
     result.update(fleet_number=candidate, fleet_status='candidate',
-                  fleet_basis='Victoria feed label (' + ('four-digit' if direct else 'recognized suffix') + ')',
+                  fleet_basis=system_id.title() + ' vehicle label (' + ('four-digit' if direct else 'recognized numeric format') + ')',
                   model=series['model'], model_key=series['model_key'],
-                  model_basis='Published Victoria fleet-series range; ' + series['series_note'])
+                  model_basis='BC Transit fleet-series reference; ' + series['series_note'])
     if 'nova_generation' in series:
         result['nova_generation'] = series['nova_generation']
-    body = nova_body_for(candidate)
+    body = nova_body_for(candidate) if system_id == 'victoria' else None
     if body:
         result.update(nova_body_variant=body['variant'], nova_body_basis=body['basis'])
-    if candidate == '9434':
+    if system_id == 'victoria' and candidate == '9434':
         # A verified exception, without introducing any new bus artwork.
         result['model'] = 'NovaBus LFS Smart Bus (2012 prototype)'
         result['model_basis'] = '2012 LFS Smart Bus prototype; Barp Victoria documents full-length roof fairings; HEV not established'
