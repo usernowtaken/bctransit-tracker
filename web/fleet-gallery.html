@@ -1,15 +1,137 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bus Radar · Supplied Fleet Art</title><style>
-:root{color-scheme:light dark}body{font:14px Arial,sans-serif;color:#222;background:#f7f7f7;margin:0;padding:16px 24px}header{max-width:1000px;margin:auto}h1{font-size:22px}p{line-height:1.5}a{color:#176bc3}main{max-width:1100px;margin:20px auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}article{background:#fff;border:1px solid #cfd4d9;padding:14px}article img{width:100%;height:148px;object-fit:contain}article h2{margin:10px 0 0;font-size:14px}@media(prefers-color-scheme:dark){body{background:#25272a;color:#eee}article{background:#34383d;border-color:#5a5d60}a{color:#9bc2ff}}
-</style></head><body><header><p><a href="/">← Back to Bus Radar</a></p><h1>Fleet model illustrations</h1><p>Illustrations show reference appearances only. Bodywork and livery may vary between vehicles. Vehicle identity is based on published fleet ranges and reported data.</p></header><main><article><img loading="lazy" decoding="async" src="/buses/vicinity30.png" alt="Vicinity 30′: vehicle illustration"><h2>Vicinity 30′</h2></article>
-<article><img loading="lazy" decoding="async" src="/buses/nova2.png" alt="NovaBus LFS Gen 2: vehicle illustration"><h2>NovaBus LFS Gen 2</h2></article>
-<article><img loading="lazy" decoding="async" src="/buses/nova3.png" alt="NovaBus LFS Gen 3: vehicle illustration"><h2>NovaBus LFS Gen 3</h2></article>
-<article><img loading="lazy" decoding="async" src="/buses/nova_smart.png" alt="NovaBus 9434 Smart LFS prototype drawing"><h2>#9434 — Smart LFS prototype (Victoria)</h2></article>
-<article><img loading="lazy" decoding="async" src="/buses/nova_lfse.png" alt="NovaBus LFSe+ electric drawing"><h2>NovaBus LFSe+ electric (Kelowna)</h2></article>
-<article><div role="img" aria-label="No image available" style="height:148px;display:flex;justify-content:center;align-items:center;background:#eee;color:#555;letter-spacing:.2em">NO IMAGE</div><h2>Small community / light-duty buses</h2></article>
-<article><img loading="lazy" decoding="async" src="/buses/xn40_classic.png" alt="New Flyer XN40 — classic: vehicle illustration"><h2>New Flyer XN40 — classic</h2></article>
-<article><img loading="lazy" decoding="async" src="/buses/xn40_greenrear.png" alt="New Flyer XN40 — green rear: vehicle illustration"><h2>New Flyer XN40 — green rear</h2></article>
-<article><img loading="lazy" decoding="async" src="/buses/xn40_cng.png" alt="New Flyer XN40 — green with blue CNG diamond: vehicle illustration"><h2>New Flyer XN40 — green with blue CNG diamond</h2></article>
-<article><img loading="lazy" decoding="async" src="/buses/xe40.png" alt="New Flyer XE40 — green: vehicle illustration"><h2>New Flyer XE40 — green</h2></article>
-<article><img loading="lazy" decoding="async" src="/buses/enviro500.png" alt="Alexander Dennis Enviro500: vehicle illustration"><h2>Alexander Dennis Enviro500</h2></article>
-<article><img loading="lazy" decoding="async" src="/buses/enviro500mmc_classic.png" alt="Enviro500 MMC — classic: vehicle illustration"><h2>Enviro500 MMC — classic</h2></article>
-<article><img loading="lazy" decoding="async" src="/buses/enviro500mmc_green.png" alt="Enviro500 MMC — green: vehicle illustration"><h2>Enviro500 MMC — green</h2></article></main></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#202124">
+  <title>Fleet Gallery · Bus Radar</title>
+  <style>
+    :root {color-scheme:dark;--bg:#202124;--panel:#25272a;--tile:#2b2d30;--line:#484b50;--text:#e8eaed;--muted:#adb0b4;--blue:#8ab4f8;font:13px/1.4 Arial,Helvetica,sans-serif;color:var(--text);background:var(--bg)}
+    *,*::before,*::after {box-sizing:border-box}
+    body {margin:0;min-height:100vh}
+    a {color:var(--blue);text-decoration:none}
+    a:hover {text-decoration:underline}
+    a:focus-visible,summary:focus-visible {outline:2px solid var(--blue);outline-offset:3px}
+    .topbar {border-bottom:1px solid var(--line);background:#25272a}
+    .topbar-inner {max-width:1110px;margin:auto;min-height:62px;padding:10px 22px;display:flex;align-items:center;gap:10px}
+    .brand-icon {width:34px;height:34px;border:1px solid #51545b;border-radius:3px;background:#34363a;display:grid;place-items:center;flex:none}
+    .brand-icon img {width:23px;height:23px}
+    .brand {min-width:0;flex:1}
+    .brand small {display:block;color:var(--muted);font-size:9px;letter-spacing:.4px}
+    .brand strong {display:block;font-size:18px;line-height:1.15;letter-spacing:-.6px}
+    .brand strong span {color:var(--blue)}
+    .version {font-size:10px;border:1px solid #54565c;border-radius:2px;color:var(--muted);background:#34363a;padding:3px 5px}
+    main {max-width:1110px;margin:auto;padding:19px 22px 45px}
+    .back {display:inline-block;font-size:12px;font-weight:600;margin-bottom:19px}
+    .head {margin-bottom:19px}
+    .head h1 {font-size:21px;letter-spacing:-.35px;line-height:1.2;margin:0 0 7px}
+    .head p {font-size:12px;color:var(--muted);margin:0}
+    .grid-heading {display:flex;align-items:center;gap:9px;margin-bottom:11px}
+    .grid-heading h2 {font-size:13px;font-weight:700;margin:0}
+    .count {font-size:10px;color:#bcbfc4;border:1px solid #51545a;border-radius:2px;padding:1px 5px}
+    .gallery {display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:9px}
+    .bus-card {min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:3px;overflow:hidden}
+    .bus-image {height:136px;display:grid;place-items:center;padding:11px 13px;background:var(--tile)}
+    .bus-image img {display:block;width:100%;height:100%;object-fit:contain}
+    .bus-meta {padding:10px 11px 11px;border-top:1px solid #414349;min-height:58px}
+    .bus-meta h2 {font-size:12px;font-weight:700;margin:0;line-height:1.3}
+    .bus-meta span {display:block;color:var(--muted);font-size:11px;margin-top:3px}
+    .details {margin-top:19px;border:1px solid var(--line);border-radius:3px;background:var(--panel)}
+    .details summary {padding:12px 13px;cursor:pointer;font-size:12px;font-weight:700;user-select:none}
+    .details summary:hover {background:#303237}
+    .details-content {border-top:1px solid var(--line);padding:11px 13px 13px;color:#c7c9cd;font-size:12px}
+    .details-content p {margin:0 0 9px}
+    .details-content p:last-child {margin:0}
+    .details-content strong {font-weight:700;color:var(--text)}
+    @media(max-width:700px) {main{padding:16px 14px 32px}.topbar-inner{padding:9px 14px}.gallery{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.bus-image{height:108px;padding:8px}.bus-meta{padding:9px;min-height:55px}.bus-meta h2{font-size:11px}.bus-meta span{font-size:10px}.head h1{font-size:19px}}
+    @media(max-width:355px) {.gallery{grid-template-columns:1fr}.bus-image{height:135px}}
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand-icon"><img src="/favicon.svg" alt=""></div>
+      <div class="brand"><small>FLEET GALLERY</small><strong>BUS<span>RADAR</span></strong></div>
+      <span class="version">V3.4.11</span>
+    </div>
+  </header>
+  <main>
+    <a class="back" href="/">← Back to Bus Radar</a>
+    <div class="head"><h1>Vehicle illustrations</h1><p>Reference drawings used throughout Bus Radar. Actual vehicle appearance may vary.</p></div>
+    <section aria-label="Available vehicle illustrations">
+      <div class="grid-heading"><h2>Fleet artwork</h2><span class="count">15</span></div>
+      <div class="gallery">
+        <article class="bus-card">
+          <div class="bus-image"><img src="/buses/vicinity30.png?v=3.4.11" alt="Vicinity 30′ — 30-foot illustration" loading="lazy" decoding="async" width="420" height="144"></div>
+          <div class="bus-meta"><h2>Vicinity 30′</h2><span>30-foot</span></div>
+        </article>
+        <article class="bus-card">
+          <div class="bus-image"><img src="/buses/vicinity35.png?v=3.4.11" alt="Vicinity 35′ — 35-foot illustration" loading="lazy" decoding="async" width="420" height="144"></div>
+          <div class="bus-meta"><h2>Vicinity 35′</h2><span>35-foot</span></div>
+        </article>
+        <article class="bus-card">
+          <div class="bus-image"><img src="/buses/handydart_old.png?v=3.4.11" alt="HandyDART — Older livery illustration" loading="lazy" decoding="async" width="420" height="144"></div>
+          <div class="bus-meta"><h2>HandyDART</h2><span>Older livery</span></div>
+        </article>
+        <article class="bus-card">
+          <div class="bus-image"><img src="/buses/handydart_new.png?v=3.4.11" alt="HandyDART — Newer livery illustration" loading="lazy" decoding="async" width="420" height="144"></div>
+          <div class="bus-meta"><h2>HandyDART</h2><span>Newer livery</span></div>
+        </article>
+        <article class="bus-card">
+          <div class="bus-image"><img src="/buses/nova2.png?v=3.4.11" alt="NovaBus LFS — Gen 2 illustration" loading="lazy" decoding="async" width="420" height="144"></div>
+          <div class="bus-meta"><h2>NovaBus LFS</h2><span>Gen 2</span></div>
+        </article>
+        <article class="bus-card">
+          <div class="bus-image"><img src="/buses/nova3.png?v=3.4.11" alt="NovaBus LFS — Gen 3 illustration" loading="lazy" decoding="async" width="420" height="144"></div>
+          <div class="bus-meta"><h2>NovaBus LFS</h2><span>Gen 3</span></div>
+        </article>
+        <article class="bus-card">
+          <div class="bus-image"><img src="/buses/nova_smart.png?v=3.4.11" alt="NovaBus Smart LFS — 9434 prototype illustration" loading="lazy" decoding="async" width="420" height="144"></div>
+          <div class="bus-meta"><h2>NovaBus Smart LFS</h2><span>9434 prototype</span></div>
+        </article>
+        <article class="bus-card">
+          <div class="bus-image"><img src="/buses/nova_lfse.png?v=3.4.11" alt="NovaBus LFSe+ — Electric illustration" loading="lazy" decoding="async" width="420" height="144"></div>
+          <div class="bus-meta"><h2>NovaBus LFSe+</h2><span>Electric</span></div>
+        </article>
+        <article class="bus-card">
+          <div class="bus-image"><img src="/buses/xn40_classic.png?v=3.4.11" alt="New Flyer XN40 — Classic illustration" loading="lazy" decoding="async" width="420" height="144"></div>
+          <div class="bus-meta"><h2>New Flyer XN40</h2><span>Classic</span></div>
+        </article>
+        <article class="bus-card">
+          <div class="bus-image"><img src="/buses/xn40_greenrear.png?v=3.4.11" alt="New Flyer XN40 — Green rear illustration" loading="lazy" decoding="async" width="420" height="144"></div>
+          <div class="bus-meta"><h2>New Flyer XN40</h2><span>Green rear</span></div>
+        </article>
+        <article class="bus-card">
+          <div class="bus-image"><img src="/buses/xn40_cng.png?v=3.4.11" alt="New Flyer XN40 — CNG illustration" loading="lazy" decoding="async" width="420" height="144"></div>
+          <div class="bus-meta"><h2>New Flyer XN40</h2><span>CNG</span></div>
+        </article>
+        <article class="bus-card">
+          <div class="bus-image"><img src="/buses/xe40.png?v=3.4.11" alt="New Flyer XE40 — Electric illustration" loading="lazy" decoding="async" width="420" height="144"></div>
+          <div class="bus-meta"><h2>New Flyer XE40</h2><span>Electric</span></div>
+        </article>
+        <article class="bus-card">
+          <div class="bus-image"><img src="/buses/enviro500.png?v=3.4.11" alt="Enviro500 — Original illustration" loading="lazy" decoding="async" width="420" height="144"></div>
+          <div class="bus-meta"><h2>Enviro500</h2><span>Original</span></div>
+        </article>
+        <article class="bus-card">
+          <div class="bus-image"><img src="/buses/enviro500mmc_classic.png?v=3.4.11" alt="Enviro500 MMC — Classic illustration" loading="lazy" decoding="async" width="420" height="144"></div>
+          <div class="bus-meta"><h2>Enviro500 MMC</h2><span>Classic</span></div>
+        </article>
+        <article class="bus-card">
+          <div class="bus-image"><img src="/buses/enviro500mmc_green.png?v=3.4.11" alt="Enviro500 MMC — Green illustration" loading="lazy" decoding="async" width="420" height="144"></div>
+          <div class="bus-meta"><h2>Enviro500 MMC</h2><span>Green</span></div>
+        </article>
+      </div>
+    </section>
+    <details class="details">
+      <summary>Image substitutions &amp; missing artwork</summary>
+      <div class="details-content">
+        <p><strong>Vicinity 30′ CNG (Central Fraser Valley)</strong> — uses the Vicinity 30′ drawing.</p>
+        <p><strong>2013 Yaxing / Vicinity</strong> — uses the Vicinity 35′ drawing.</p>
+        <p><strong>NovaBus LFS Gen 4 (Kelowna / Chilliwack / Cowichan)</strong> — uses the Gen 3 reference drawing. The model remains labeled Gen 4; this is not an exact Gen 4 depiction.</p>
+        <p><strong>Other vehicles without supplied artwork</strong> — PLACEHOLDER / N/A.</p>
+      </div>
+    </details>
+  </main>
+</body>
+</html>

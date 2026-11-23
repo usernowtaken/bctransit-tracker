@@ -13,6 +13,7 @@ import sqlite3
 import threading
 import time
 from typing import Any
+from fleet_identity import identify_feed_vehicle
 
 from vehicle_activity import ALLOWED_WINDOWS, MAX_ROWS, build_activity
 
@@ -49,10 +50,13 @@ class GPSHistory:
         # Add columns without losing a Beta SQLite volume.
         columns = {row[1] for row in self.db.execute('PRAGMA table_info(fixes)')}
         with self.db:
+            if 'fleet_number' not in columns:
+                self.db.execute('ALTER TABLE fixes ADD COLUMN fleet_number TEXT')
             if 'proximity_state' not in columns:
                 self.db.execute('ALTER TABLE fixes ADD COLUMN proximity_state TEXT')
             if 'distance_m' not in columns:
                 self.db.execute('ALTER TABLE fixes ADD COLUMN distance_m INTEGER')
+            self.db.execute('CREATE INDEX IF NOT EXISTS fixes_fleet_lookup ON fixes(system,fleet_number,gps_ts)')
         self.last_purge = 0
 
     def append(self, system: str, vehicles: list[dict[str, Any]], index: dict[str, Any] | None = None,
@@ -60,7 +64,7 @@ class GPSHistory:
                proximity: dict[str, dict[str, Any]] | None = None) -> int:
         """Insert fresh, distinct GPS timestamps once; this is not a route snapper."""
         now = int(time.time() if now is None else now)
-        if system not in ('victoria', 'chilliwack', 'kelowna'):
+        if system not in ('victoria', 'chilliwack', 'kelowna', 'cowichan'):
             raise ValueError('Unsupported transit system')
         index = index or {}
         proximity = proximity or {}
@@ -90,9 +94,11 @@ class GPSHistory:
                 prox_status = None
             dist = info.get('distance_m')
             dist = int(dist) if isinstance(dist, (float,int)) and math.isfinite(dist) and 0 <= dist < 1000000 else None
+            fleet_number = identify_feed_vehicle(system, vehicle.get('label'), ident).get('fleet_number')
             batch.append((system, ident, ts, lat, lon, str(route)[:24] if route else None,
                           str(trip_id)[:256] if trip_id else None,
-                          str(vehicle.get('label') or '')[:128] or None, now, prox_status, dist))
+                          str(vehicle.get('label') or '')[:128] or None, now, prox_status, dist,
+                          fleet_number))
         if not batch and now - self.last_purge < 600:
             return 0
         with self.lock:
@@ -100,8 +106,8 @@ class GPSHistory:
                 before = self.db.total_changes
                 if batch:
                     self.db.executemany('''INSERT OR IGNORE INTO fixes
-                        (system,vehicle_id,gps_ts,lat,lon,route,trip_id,label,recorded_at,proximity_state,distance_m)
-                        VALUES (?,?,?,?,?,?,?,?,?,?,?)''', batch)
+                        (system,vehicle_id,gps_ts,lat,lon,route,trip_id,label,recorded_at,proximity_state,distance_m,fleet_number)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)''', batch)
                 added = self.db.total_changes - before
                 if now - self.last_purge >= 600:
                     self.db.execute('DELETE FROM fixes WHERE gps_ts < ?', (now - RETENTION_S,))
@@ -110,7 +116,7 @@ class GPSHistory:
 
     def get(self, system: str, vehicle_id: str, minutes: int = 30,
             now: int | None = None) -> dict[str, Any]:
-        if system not in ('victoria', 'chilliwack', 'kelowna'):
+        if system not in ('victoria', 'chilliwack', 'kelowna', 'cowichan'):
             raise ValueError('Unsupported transit system')
         if not vehicle_id or len(vehicle_id) > 128:
             raise ValueError('Invalid vehicle identifier')
@@ -133,7 +139,7 @@ class GPSHistory:
     def activity(self, system: str, vehicle_id: str, minutes: int = 180,
                  now: int | None = None) -> dict[str, Any]:
         """Summarize recorded observations only; no scheduled routes or interpolated trips."""
-        if system not in ('victoria', 'chilliwack', 'kelowna'):
+        if system not in ('victoria', 'chilliwack', 'kelowna', 'cowichan'):
             raise ValueError('Unsupported transit system')
         if not vehicle_id or len(vehicle_id) > 128:
             raise ValueError('Invalid vehicle identifier')
@@ -154,21 +160,21 @@ class GPSHistory:
     def last_known(self, system: str, vehicle_id: str = '', fleet: str = '',
                    now: int | None = None) -> dict[str, Any]:
         """Return the last recorded fix (24 h max), clearly not a live position."""
-        if system not in ('victoria', 'chilliwack', 'kelowna'):
+        if system not in ('victoria', 'chilliwack', 'kelowna', 'cowichan'):
             raise ValueError('Unsupported transit system')
         if not vehicle_id and not fleet:
             raise ValueError('Vehicle ID or fleet number required')
-        if fleet and (system != 'victoria' or len(fleet) != 4 or not fleet.isdigit()):
-            raise ValueError('Fleet lookup requires a four-digit Victoria fleet number')
+        if fleet and (len(fleet) != 4 or not fleet.isdigit()):
+            raise ValueError('Fleet lookup requires a four-digit fleet number')
         if vehicle_id and len(vehicle_id) > 128:
             raise ValueError('Vehicle ID too long')
         now = int(time.time() if now is None else now)
         with self.lock:
             if fleet:
                 row = self.db.execute('''SELECT vehicle_id,gps_ts,lat,lon,route,trip_id,label
-                    FROM fixes WHERE system=? AND label IN (?,?) AND gps_ts>=? AND gps_ts<=?
+                    FROM fixes WHERE system=? AND (fleet_number=? OR label IN (?,?)) AND gps_ts>=? AND gps_ts<=?
                     ORDER BY gps_ts DESC LIMIT 1''',
-                    (system, '313135' + fleet, fleet, now-RETENTION_S, now+60)).fetchone()
+                    (system, fleet, '313135' + fleet, fleet, now-RETENTION_S, now+60)).fetchone()
             else:
                 row = self.db.execute('''SELECT vehicle_id,gps_ts,lat,lon,route,trip_id,label
                     FROM fixes WHERE system=? AND vehicle_id=? AND gps_ts>=? AND gps_ts<=?

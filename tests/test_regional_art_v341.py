@@ -33,10 +33,16 @@ class RegionalArtTests(unittest.TestCase):
             for label in ('something7010','3131359999','x7010','701000',''):
                 self.assertIsNone(identify_vehicle(sys,label)['fleet_number'])
     def test_exact_supplied_image_bytes(self):
-        names={'nova_smart.png':'novabus 2012.png', 'nova_lfse.png':'novabus lfse.png'}
-        for out,original in names.items():
+        # The project owner's two source-image uploads are not always mounted
+        # alongside a deployed code package. Verify exact hashes of the supplied
+        # image bytes from the accepted V3.4.5 baseline instead.
+        expected = {
+            'nova_smart.png': '5811dec1f29144fdde63f25b8d1495317c0e88c135ea593206f677e5ca0b7681',
+            'nova_lfse.png': 'bad9e88f473e84e373a409fa2e970bd170875d667bbb71f02dc9bc03d08d4d03',
+        }
+        for out, sha256 in expected.items():
             with self.subTest(out=out):
-                self.assertEqual((ROOT/'web/buses'/out).read_bytes(), (Path('/mnt/data')/original).read_bytes())
+                self.assertEqual(hashlib.sha256((ROOT/'web/buses'/out).read_bytes()).hexdigest(), sha256)
     def test_placeholder_on_profile(self):
         html=(ROOT/'web/index.html').read_text()
         js=(ROOT/'web/app.js').read_text()

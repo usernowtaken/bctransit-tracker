@@ -1,7 +1,7 @@
 {
   "source": "full-original.png",
   "sha256": "ce6d6c818bb274127ab6707c10dd3376b32eb6d78d56af9181eb9bb4adfc05fb",
-  "method": "All illustrations preserve source RGB pixels; only the connected exterior white background of the current Vicinity drawing is made transparent.",
+  "method": "Sheet-derived drawings preserve source RGB pixels, with only connected exterior background made transparent. Additional user-supplied regional drawings (Vicinity 35, old HandyDART, new HandyDART, updated LFSe) also have only their border-connected white background removed.",
   "assets": {
     "xe40": {
       "file": "xe40.png",
@@ -93,6 +93,24 @@
         1964,
         1635
       ]
+    }
+  },
+  "uploaded_assets": {
+    "vicinity35": {
+      "file": "vicinity35.png",
+      "source": "22da48c5-b4dd-5a18-808f-e88fd071c452.png"
+    },
+    "handydart_old": {
+      "file": "handydart_old.png",
+      "source": "6a2a382c-499a-5376-887a-51f3108fafc3.png"
+    },
+    "handydart_new": {
+      "file": "handydart_new.png",
+      "source": "c51599ab-190d-5c2c-88b4-d8af8c33bf6b.png"
+    },
+    "nova_lfse": {
+      "file": "nova_lfse.png",
+      "source": "1b05fe5b-d1ad-5d7f-bd15-03ed1dfe2600.png"
     }
   }
 }

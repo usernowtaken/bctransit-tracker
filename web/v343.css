@@ -1,0 +1,56 @@
+/* V3.4.3: passenger-first information hierarchy. Technical functionality unchanged. */
+/* Avoid stacking static status prose across the map and sidebar. */
+.stats-row { display:none !important; } /* Active count already appears next to the list heading. */
+.map-bottom .map-help, .map-bottom .refresh-note { display:none !important; }
+.v31-alerts #alertsMainIntro:empty, .nearby-section #nearbyHint:empty {display:none !important;}
+.v33-board .v32-board-hint:empty, .route-change-panel #nextTripOverlayStatus:empty {display:none !important;}
+.detail-section .detail-identity .detail-eyebrow, .fleet-profile .detail-eyebrow {display:none !important;}
+.detail-section .detail-destination {margin:8px 0 10px;}
+.detail-section .fleet-profile {margin-bottom:9px;}
+.detail-section .v33-motion-note[hidden] {display:none !important;}
+/* Compact but finger-friendly actions: no walls of buttons. */
+.v343-quick-actions {display:grid;grid-template-columns:1.25fr 1fr;gap:7px;margin:10px 0 5px;}
+.v343-secondary-actions {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:0 0 8px;}
+.v343-quick-actions button, .v343-secondary-actions button {width:100%;min-width:0;margin:0;min-height:39px;padding:8px 4px;font-size:12px;white-space:normal;line-height:1.2;}
+.v343-quick-actions button {min-height:43px;font-size:13px;font-weight:700;}
+.v343-secondary-actions .favorite-route-button {margin:0;}
+.compact-detail-grid {grid-template-columns:repeat(2,minmax(0,1fr));margin:8px 0 12px;}
+.compact-detail-grid>div {padding:9px 11px;gap:3px;}
+/* Route panel begins with what matters next. Entire route can be expanded separately. */
+.route-stops-panel .stop-pair {margin:8px 0 4px;}
+.route-stops-panel .stop-pair small {text-transform:none;letter-spacing:0;}
+.v343-route-status:empty, .v343-stop-basis:empty {display:none !important;}
+.v343-all-stops {margin:7px 0 0;border-top:1px solid var(--line);}
+.v343-all-stops>summary {padding:10px 6px;list-style:revert;cursor:pointer;font-size:12px;font-weight:650;color:var(--text);}
+.v343-all-stops>.all-stops-list {max-height:34vh;overflow-y:auto;overscroll-behavior:contain;}
+.v343-about-estimates {margin:9px 0 12px;border-top:1px solid var(--line);font-size:11px;}
+.v343-about-estimates>summary {padding:10px 0;cursor:pointer;color:var(--muted);font-weight:600;}
+.v343-about-estimates p {font-size:11px;color:var(--muted);line-height:1.45;padding:0 2px 8px;margin:0;}
+/* Show no text when there is no actionable status. */
+.route-change-panel #nextTripOverlayStatus:empty,
+.detail-section #historyStatus:empty,
+.detail-section #activityStatus:empty,
+.v31-detail-alerts .v31-alert-list:empty {display:none !important;}
+/* Less scaffolding around headings, retaining visibility and touch targets. */
+.sidebar>.search-section {padding-bottom:8px;}
+.sidebar .section-heading {padding-top:10px;}
+.sidebar .section-heading h2 {letter-spacing:0;font-weight:700;}
+.sidebar .list-hint[hidden] {display:none !important;}
+.sidebar .fleet-section .section-heading {padding-bottom:8px;}
+.fleet-profile .nova-body-note:empty {display:none !important;}
+.v34-settings-head .v34-kicker:empty {display:none !important;}
+.v34-settings .v34-field small:empty, .v34-settings .v34-check small:empty {display:none !important;}
+/* Don't constrain user-selected larger text or touch accessibility. */
+@media(max-width:720px){
+ .v343-quick-actions button,.v343-secondary-actions button {min-height:44px;}
+ .v343-quick-actions {gap:8px;}
+ .v343-secondary-actions {gap:6px;}
+ .v343-all-stops>.all-stops-list {max-height:42dvh;}
+ .detail-section .fleet-profile {padding:8px;}
+}
+@media(max-width:340px){.v343-secondary-actions button{font-size:11px;}}
+
+/* Avoid repeating the route number and departure-sheet title. */
+.detail-section .detail-identity h2{display:none;}
+.detail-section .detail-identity{margin-bottom:3px;}
+.v33-board .v32-board-heading>strong{display:none;}

@@ -36,7 +36,7 @@ class V31Tests(unittest.TestCase):
             db.append('kelowna',[{'id':'raw2','lat':49.9,'lon':-119.5,'timestamp':now-60}],now=now)
             self.assertTrue(db.last_known('kelowna',vehicle_id='raw2',now=now)['found'])
             self.assertFalse(db.last_known('victoria',vehicle_id='raw2',now=now)['found'])
-            with self.assertRaises(ValueError): db.last_known('kelowna',fleet='9434',now=now)
+            self.assertFalse(db.last_known('kelowna',fleet='9434',now=now)['found'])
             db.close()
     def test_last_known_expired(self):
         now=int(time.time())

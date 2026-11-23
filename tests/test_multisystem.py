@@ -10,7 +10,7 @@ import app
 class MultiSystemTests(unittest.TestCase):
     def test_verified_system_ids_and_separate_urls(self):
         self.assertEqual({key: value['operator'] for key,value in app.SYSTEMS.items()},
-                         {'victoria':48,'chilliwack':13,'kelowna':47})
+                         {'victoria':48,'chilliwack':13,'kelowna':47,'cowichan':10})
         self.assertIn('operatorIds=13',app.system_feed_url('chilliwack','vehicle'))
         self.assertIn('operatorIds=47',app.system_feed_url('kelowna','static'))
         self.assertIn('operatorIds=48',app.system_feed_url('victoria','trip'))

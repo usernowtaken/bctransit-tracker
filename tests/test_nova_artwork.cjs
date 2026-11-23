@@ -13,6 +13,7 @@ const BUS_ART = {
   nova2:[{id:'nova2',name:'Gen 2 original drawing'}],
   nova3:[{id:'nova3',name:'Gen 3 original drawing'}],
   nova_lfse:[{id:'nova_lfse',name:'LFSe electric drawing'}],
+  light_duty:[{id:'handydart_old'},{id:'handydart_new'}],
   xn40:[{id:'xn40_classic'},{id:'xn40_greenrear'},{id:'xn40_cng'}]
 };
 const localStorage = {getItem:()=>null};
@@ -39,6 +40,7 @@ assert.strictEqual(funcs.busArtVariant(bus(9589,'enviro500mmc')).id,'enviro500mm
 assert.strictEqual(funcs.busArtVariant(bus(9426)).id,'nova3','confirmed fleet remains fixed');
 state.system='kelowna';
 assert.strictEqual(funcs.busArtVariant(bus(7010,'nova_lfse')).id,'nova_lfse');
-assert.strictEqual(funcs.busArtVariant(bus(2922,'light_duty')),null);
-assert.strictEqual(funcs.busArtVariant(bus(9426)).id,'nova2','Victoria mapping must not apply elsewhere');
+assert.strictEqual(funcs.busArtVariant(bus(2922,'light_duty')).id,'handydart_new');
+assert.strictEqual(funcs.busArtVariant(bus(9426,'nova3',{nova_generation:3,nova_body_variant:'raised'})).id,'nova3','verified regional 2009 roof styling remains available');
+assert.strictEqual(funcs.busArtVariant(bus(9332,'nova3',{nova_generation:3})).id,'nova3','regional Gen 3 uses raised default');
 console.log('Nova per-fleet artwork logic PASS');

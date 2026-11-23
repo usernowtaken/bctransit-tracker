@@ -25,7 +25,7 @@ import webbrowser
 import zipfile
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
-from fleet_identity import identify_vehicle
+from fleet_identity import identify_vehicle, identify_feed_vehicle
 from service_alerts import parse_alert_feed
 from gps_history import GPSHistory
 from zoneinfo import ZoneInfo
@@ -52,7 +52,96 @@ SYSTEMS = {
                    "unassigned_bounds": (49.08, 49.25, -122.08, -121.68)},
     "kelowna": {"name": "Kelowna", "operator": 47, "center": [49.887, -119.496], "zoom": 11,
                 "bounds": (49.45, 50.55, -120.7, -118.65)},
+    # Dedicated operator 10 covers Cowichan Valley, commuter buses into
+    # downtown Victoria (66/99), and Nanaimo via the 70 NCX. Keep all in view.
+    "cowichan": {"name": "Cowichan Valley", "operator": 10,
+                 "center": [48.790, -123.708], "zoom": 10,
+                 "bounds": (48.34, 49.28, -124.40, -123.22)},
 }
+
+def route_in_view(system_id: str, route: dict[str, Any] | None) -> bool:
+    """Whether a published route belongs to this *displayed* transit system.
+
+    Operator 13 is a wider Fraser Valley feed; only Chilliwack/FVX routes
+    belong in this view. All other regions have their own dedicated feeds.
+    """
+    if system_id != 'chilliwack':
+        return True
+    return str((route or {}).get('short') or '').strip().upper() in SYSTEMS['chilliwack']['routes']
+
+
+def trip_in_view(system_id: str, index: dict[str, Any], trip_id: str) -> bool:
+    trip = index.get('trips', {}).get(trip_id)
+    if not trip:
+        return False
+    route = index.get('routes', {}).get(trip.get('route_id') or '')
+    return bool(route and route_in_view(system_id, route))
+
+
+def vehicle_in_view(system_id: str, index: dict[str, Any], vehicle: dict[str, Any]) -> bool:
+    if system_id != 'chilliwack':
+        return True
+    trip = index.get('trips', {}).get(vehicle.get('trip_id') or '', {})
+    rid = vehicle.get('route_id') or trip.get('route_id') or ''
+    route = index.get('routes', {}).get(rid, {})
+    public = str(route.get('short') or '').strip().upper()
+    if not public and len(str(rid)) <= 4:
+        public = str(rid).strip().upper()
+    if public:
+        return public in SYSTEMS['chilliwack']['routes']
+    # Unassigned local buses are useful, but don't expose unidentified buses
+    # from Abbotsford / Mission in Chilliwack's radar or history.
+    a, b, c, d = SYSTEMS['chilliwack']['unassigned_bounds']
+    return a <= vehicle.get('lat', -90) <= b and c <= vehicle.get('lon', -180) <= d
+
+
+def region_stop_ids(system_id: str, index: dict[str, Any]) -> set[str] | None:
+    """Public-stop IDs served by this region's allowed GTFS trips.
+
+    None means no restriction needed. An empty set means GTFS has not
+    supplied enough metadata to show a trustworthy Chilliwack stop board.
+    """
+    if system_id != 'chilliwack':
+        return None
+    allowed_routes = {rid for rid,route in index.get('routes', {}).items()
+                      if route_in_view(system_id, route)}
+    ids: set[str] = set()
+    if allowed_routes:
+        for tid,trip in index.get('trips', {}).items():
+            if trip.get('route_id') not in allowed_routes:
+                continue
+            for row in index.get('trip_stops', {}).get(tid, []):
+                if len(row) >= 2 and row[1]:
+                    ids.add(str(row[1]))
+    return ids
+
+
+def region_alerts(system_id: str, alerts: list[dict[str, Any]], index: dict[str, Any],
+                  stops: set[str] | None = None) -> list[dict[str, Any]]:
+    """Exclude other Fraser Valley routes and unscoped regional alerts.
+
+    Do not reinterpret an operator-wide warning as Chilliwack-wide; the
+    operator publishes Abbotsford/Mission as well. A relevant GTFS selector
+    must be resolvable to an allowed route, trip or stop.
+    """
+    if system_id != 'chilliwack':
+        return alerts
+    routes = index.get('routes', {})
+    trips = index.get('trips', {})
+    stops = region_stop_ids(system_id, index) if stops is None else stops
+    def matches(selector: dict[str, Any]) -> bool:
+        rid, tid, sid = (str(selector.get(k) or '') for k in ('route_id','trip_id','stop_id'))
+        if not (rid or tid or sid):
+            return False
+        if rid and not route_in_view(system_id, routes.get(rid)):
+            return False
+        if tid and not trip_in_view(system_id, index, tid):
+            return False
+        if sid and sid not in stops:
+            return False
+        return True
+    return [item for item in alerts if any(matches(s) for s in item.get('selectors', []))]
+
 
 def system_feed_url(system_id: str, kind: str) -> str:
     op = SYSTEMS[system_id]["operator"]
@@ -68,12 +157,12 @@ def system_feed_url(system_id: str, kind: str) -> str:
     raise ValueError("Unsupported feed type")
 
 POLL_SECONDS = max(15, int(os.environ.get("BCT_POLL_SECONDS", "15")))
-# Avoid 3 simultaneous large GTFS ZIP decompressions on small Railway plans.
+# Avoid 4 simultaneous large GTFS ZIP decompressions on small Railway plans.
 STATIC_PARSE_LOCK = threading.Lock()
 MAX_FEED_BYTES = 12 * 1024 * 1024
 MAX_ZIP_BYTES = 85 * 1024 * 1024
 REQUEST_TIMEOUT = 16
-USER_AGENT = "BCTransitBusRadar/3.3 (unofficial public transit map)"
+USER_AGENT = "BCTransitBusRadar/3.4.11 (unofficial public transit map)"
 TIMEZONE = ZoneInfo("America/Vancouver")
 
 OFF_ROUTE_THRESHOLD_M = 100  # user-selected heuristic; route detours / GPS noise can trigger off-route warnings
@@ -423,44 +512,170 @@ def stop_context(index: dict[str, Any], vehicle: dict[str, Any], now: datetime) 
     return {"basis": basis, "previous": prev, "next": nxt, "upcoming": [x for x in upcoming if x]}
 
 
-def next_run(index: dict[str, Any], vehicle: dict[str, Any], now: datetime) -> dict[str, Any] | None:
-    trip_id = vehicle.get("trip_id") or ""
-    trip = index.get("trips", {}).get(trip_id)
-    if not trip or not trip.get("block_id") or trip.get("last") is None:
+def infer_service_label(headsign: str | None, route_name: str | None) -> dict[str, str]:
+    """Recognize a *route-wide* label, not a confirmed destination-sign reading.
+
+    A pair of terminal names (e.g. Royal Oak Exch/Westhills Exch) is the
+    published route description, not a specific destination. Never flag
+    a directional label such as 'to Royal Oak Exch'. This remains an
+    inference, independent of GPS-distance-based deadhead observations.
+    """
+    label = (headsign or '').strip()
+    general = (route_name or '').strip()
+    def endpoint_pair(value: str) -> bool:
+        chunks = [chunk.strip() for chunk in value.split('/')]
+        return len(chunks) >= 2 and all(len(chunk) >= 3 for chunk in chunks) and not any(
+            chunk.casefold().startswith(('to ', 'via ')) for chunk in chunks)
+    if label.casefold().startswith(('to ', 'via ')):
+        return {'state': 'regular', 'basis': 'Specific directional destination label'}
+    if label and endpoint_pair(label):
+        return {'state': 'likely_nis', 'basis': 'Generic multiple-terminal route label, not a directional headsign'}
+    if not label and general and endpoint_pair(general):
+        return {'state': 'likely_nis', 'basis': 'Only the generic route name is available; no directional destination reported'}
+    return {'state': 'regular' if label else 'unknown', 'basis': 'No generic multiple-terminal route label detected'}
+
+
+def _heading(a: tuple[float, float], b: tuple[float, float]) -> float:
+    latitude = math.radians((a[0]+b[0])/2)
+    east = (b[1]-a[1]) * max(0.2,math.cos(latitude))
+    north = b[0]-a[0]
+    return (math.degrees(math.atan2(east,north))+360) % 360
+
+
+def _angle_gap(a: float, b: float) -> float:
+    return abs((a-b+180) % 360 - 180)
+
+
+def route_aligned_bearing(index: dict[str, Any], vehicle: dict[str, Any],
+                          now_ts: float | None = None) -> dict[str, Any]:
+    """Visual-only direction from the ordered *assigned trip* GTFS shape.
+
+    Do not use unrelated route variants (often the opposite direction).
+    Reject stale fixes, distant geometry, crossing/loop ambiguity, or
+    a large contradiction with a moving vehicle's reported GPS bearing.
+    The raw GTFS bearing remains in `bearing` for diagnostics/history.
+    """
+    raw = vehicle.get('bearing')
+    try:
+        raw = float(raw) if raw is not None and math.isfinite(float(raw)) and 0 <= float(raw) <= 360 else None
+    except (ValueError, TypeError):
+        raw = None
+    fallback = {'display_bearing': raw, 'bearing_basis': 'GTFS vehicle position' if raw is not None else 'Unavailable'}
+    stamp = vehicle.get('timestamp')
+    now_ts = time.time() if now_ts is None else now_ts
+    if not isinstance(stamp, (int,float)) or not -60 <= now_ts - stamp <= 120:
+        return fallback
+    trip = index.get('trips', {}).get(vehicle.get('trip_id') or '', {})
+    if not trip or not trip.get('shape_id'):
+        return fallback
+    reported = vehicle.get('route_id')
+    if reported and reported in index.get('routes', {}) and reported != trip.get('route_id'):
+        return fallback
+    points = index.get('shapes', {}).get(trip['shape_id'], [])
+    if len(points) < 2:
+        return fallback
+    try:
+        lat, lon = float(vehicle['lat']), float(vehicle['lon'])
+        if not math.isfinite(lat) or not math.isfinite(lon):
+            return fallback
+    except (ValueError, TypeError, KeyError):
+        return fallback
+    # Latitude/longitude projected to metres around the present GPS fix.
+    east_scale = 111320 * max(0.2, math.cos(math.radians(lat)))
+    north_scale = 111320
+    positions = [((q[1]-lon)*east_scale, (q[0]-lat)*north_scale) for q in points]
+    matches = []
+    for i,(a,b) in enumerate(zip(positions, positions[1:])):
+        vx,vy=b[0]-a[0],b[1]-a[1]
+        length_sq=vx*vx+vy*vy
+        if length_sq<4: continue
+        t=max(0.,min(1.,-(a[0]*vx+a[1]*vy)/length_sq))
+        distance=math.hypot(a[0]+t*vx,a[1]+t*vy)
+        if distance > 80: continue
+        # Direction of travel is the order of trip-shape points. Look ahead
+        # along the next segments to reduce sharp turn jitter.
+        x0,y0=a[0]+t*vx,a[1]+t*vy
+        remaining=35.
+        x1,y1=x0,y0
+        for j in range(i,len(positions)-1):
+            dest=positions[j+1]
+            dx,dy=dest[0]-x1,dest[1]-y1
+            length=math.hypot(dx,dy)
+            if length < 0.1: continue
+            step=min(remaining,length)
+            x1+=dx*step/length;y1+=dy*step/length
+            remaining-=step
+            if remaining<=0.01:break
+        if math.hypot(x1-x0,y1-y0)<3:
+            x1,y1=b
+        direction=(math.degrees(math.atan2(x1-x0,y1-y0))+360)%360
+        matches.append((distance,direction))
+    if not matches: return fallback
+    nearest=min(x[0] for x in matches)
+    # Two near-identical segments heading in different directions are often
+    # an out-and-back overlap, interchange loop or intersection.
+    nearby=[x for x in matches if x[0] <= nearest+10]
+    moving = isinstance(vehicle.get('speed_mps'), (int,float)) and vehicle['speed_mps'] >= 1.3
+    if raw is not None and moving:
+        aligned=[x for x in nearby if _angle_gap(x[1],raw) <= 75]
+        if not aligned:
+            return fallback
+        distance, heading = min(aligned,key=lambda x:(x[0] + _angle_gap(x[1],raw)*.14))
+    else:
+        distance, heading=min(nearby,key=lambda x:x[0])
+        if any(_angle_gap(heading,x[1])>60 for x in nearby):
+            return fallback
+    return {'display_bearing': round(heading,1),
+            'bearing_basis': 'Ordered GTFS trip shape · inferred direction (GPS near route)'}
+
+
+def next_run(index: dict[str, Any], vehicle: dict[str, Any], now: datetime,
+             system_id: str = 'victoria') -> dict[str, Any] | None:
+    """Next *different public route number* in this bus's scheduled block.
+
+    Skip successive trips on the same route (including the return direction).
+    A block is a schedule hypothesis, not confirmation a driver/bus will take it.
+    """
+    trip_id = vehicle.get('trip_id') or ''
+    trip = index.get('trips', {}).get(trip_id)
+    if not trip or not trip.get('block_id') or trip.get('last') is None:
         return None
-    # Avoid predictions for vehicles with stale/outdated or unspecified position timestamps.
-    stamp = vehicle.get("timestamp")
+    stamp = vehicle.get('timestamp')
     if not isinstance(stamp, int) or abs(now.timestamp()-stamp) > 600:
         return None
     service_day = resolve_service_day(index, vehicle, now)
-    if service_day is None:
-        return None
-    current_end = trip["last"]
-    options = []
-    for tid in index.get("blocks", {}).get(trip["block_id"], []):
-        if tid == trip_id:
+    if service_day is None: return None
+    routes=index.get('routes', {})
+    current_route=routes.get(trip.get('route_id') or '', {}).get('short')
+    if not current_route: return None
+    current_name=str(current_route).strip().upper()
+    current_end=trip['last']
+    options=[]
+    for tid in index.get('blocks', {}).get(trip['block_id'], []):
+        if tid == trip_id: continue
+        nxt=index['trips'][tid]
+        first=nxt.get('first')
+        # Extend the search across multiple turns on the same route, but don't
+        # reach into another day's vehicle block.
+        if first is None or first<current_end-60 or first-current_end>12*3600:continue
+        if not service_active(index,nxt.get('service_id') or '',service_day):continue
+        options.append((first,tid))
+    skipped=0
+    for first,tid in sorted(options):
+        candidate=index['trips'][tid]
+        route=routes.get(candidate.get('route_id') or '',{})
+        public=str(route.get('short') or '').strip()
+        if not public or not route_in_view(system_id, route): continue
+        if public.upper()==current_name:
+            skipped+=1
             continue
-        nxt = index["trips"][tid]
-        first = nxt.get("first")
-        if first is None or first < current_end-60 or first-current_end > 4*3600:
-            continue
-        if not service_active(index, nxt.get("service_id") or "", service_day):
-            continue
-        options.append((first, tid))
-    if not options:
-        return None
-    first, tid = min(options)
-    candidate = index["trips"][tid]
-    route = index["routes"].get(candidate["route_id"], {})
-    current_route_id = trip.get("route_id")
-    return {"route": route.get("short") or None,
-            "route_name": route.get("long") or None,
-            "headsign": candidate.get("headsign") or None,
-            "trip_id": tid,
-            "starts_at": f"{(first//3600)%24:02d}:{(first%3600)//60:02d}" + (" (+1d)" if first>=86400 else ""),
-            "different_route": candidate.get("route_id") != current_route_id,
-            "basis": "GTFS block schedule — unconfirmed vehicle assignment"}
-
+        return {'route':public,'route_name':route.get('long') or None,
+                'headsign':candidate.get('headsign') or None,
+                'trip_id':tid,
+                'starts_at':f'{(first//3600)%24:02d}:{(first%3600)//60:02d}'+(' (+1d)' if first>=86400 else ''),
+                'different_route':True,'skipped_same_route':skipped,
+                'basis':'GTFS vehicle-block schedule — first different route; assignment unconfirmed'}
+    return None
 
 
 def route_distance_m(lat: float, lon: float, polyline: list[list[float]]) -> float | None:
@@ -647,6 +862,7 @@ class Tracker:
         self.revision = 0
         self._snapshot_cache = None
         self._stop_timetable_index = None  # lazy: nearby board never delays startup
+        self._visible_stop_cache = None
         self._load_index()
 
     def _load_index(self) -> None:
@@ -671,6 +887,7 @@ class Tracker:
         with self.lock:
             self.index = index
             self._stop_timetable_index = None
+            self._visible_stop_cache = None
             # A refreshed GTFS shape may differ; retain only matching observations.
             self.proximity_observations = update_proximity_observations(
                 index, self.vehicles, {}, time.time())
@@ -687,9 +904,18 @@ class Tracker:
             except OSError as exc:
                 print(f"[GTFS] Cache save failed: {exc}")
 
+    def _view_stops(self) -> set[str] | None:
+        if self._visible_stop_cache is None:
+            # Use None only for region-specific filtering that isn't needed.
+            self._visible_stop_cache = region_stop_ids(self.system_id, self.index)
+        return self._visible_stop_cache
+
     def update_feed(self, data: bytes) -> None:
         vehicles, stamp = parse_vehicle_feed(data, self.system_id)
         with self.lock:
+            # Filter the shared Fraser Valley feed *before* storing history,
+            # computing NIS proximity or exposing live buses.
+            vehicles = [v for v in vehicles if vehicle_in_view(self.system_id, self.index, v)]
             self.vehicles = vehicles
             self.proximity_observations = update_proximity_observations(
                 self.index, vehicles, self.proximity_observations, time.time())
@@ -736,6 +962,8 @@ class Tracker:
             try:
                 parsed = parse_alert_feed(fetch_bytes(self.urls['alerts'], MAX_FEED_BYTES), gtfs_realtime_pb2)
                 with self.lock:
+                    parsed['alerts'] = region_alerts(self.system_id, parsed['alerts'], self.index,
+                                                     self._view_stops())
                     self.alerts = {**parsed, 'ready': True}
                     self.alerts_error = None
             except Exception as exc:
@@ -755,6 +983,9 @@ class Tracker:
             error = self.trip_feed_error
             trip = index.get("trips", {}).get(trip_id, {})
             rows = index.get("trip_stops", {}).get(trip_id, [])
+            if not trip_in_view(self.system_id, index, trip_id):
+                return {"trip_id": trip_id, "status": "unavailable", "stops": [],
+                        "error": "Trip is not in this transit system"}
             if not update:
                 return {"trip_id": trip_id, "status": "unavailable", "stops": [], "error": error}
             vehicle = next((v for v in self.vehicles if v.get("trip_id") == trip_id), None)
@@ -828,18 +1059,10 @@ class Tracker:
                 public_route = route.get("short") or None
                 if not public_route and rid and len(rid) <= 4 and rid.replace("X", "").isdigit():
                     public_route = rid
-                # Operator 13 includes Central Fraser Valley and Abbotsford.
-                # Chilliwack shows only its published local / FVX route numbers;
-                # include unassigned vehicles only while physically in Chilliwack.
-                if self.system_id == "chilliwack":
-                    allowed = SYSTEMS["chilliwack"]["routes"]
-                    if public_route:
-                        if str(public_route).strip().upper() not in allowed:
-                            continue
-                    else:
-                        a, b, c, d = SYSTEMS["chilliwack"]["unassigned_bounds"]
-                        if not (a <= v["lat"] <= b and c <= v["lon"] <= d):
-                            continue
+                # A shared Fraser Valley feed must never leak unrelated
+                # Abbotsford/Mission vehicles into the local Chilliwack view.
+                if not vehicle_in_view(self.system_id, index, v):
+                    continue
                 proximity = self.proximity_observations.get(v.get("id") or "")
                 if not proximity or proximity.get("trip_id") != v.get("trip_id") or proximity.get("timestamp") != v.get("timestamp"):
                     proximity = update_proximity_observations(index, [v], {}, now.timestamp()).get(v.get("id") or "", {})
@@ -848,12 +1071,14 @@ class Tracker:
                 if not isinstance(v.get("timestamp"), (int, float)) or now.timestamp()-v["timestamp"] > MAX_POSITION_AGE_S:
                     proximity = route_proximity(index, v, now.timestamp())
                 public_proximity = {key:proximity.get(key) for key in ("state", "distance_m", "basis", "threshold_m", "observations")}
-                enriched.append({**v, **identify_vehicle(self.system_id, v.get("label")), "route": public_route, "route_name": route.get("long") or None,
+                enriched.append({**v, **identify_feed_vehicle(self.system_id, v.get("label"), v.get("id")), "route": public_route, "route_name": route.get("long") or None,
                     "route_proximity": public_proximity,
+                    "service_inference": infer_service_label(trip.get("headsign"),route.get("long")),
+                    **route_aligned_bearing(index, v, now.timestamp()),
                     "headsign": trip.get("headsign") or None, "route_color": route_color(route, rid),
                     "route_text_color": route.get("text_color") or None,
                     "block_id": trip.get("block_id") or None,
-                    "stops": stop_context(index, v, now), "next_run": next_run(index, v, now)})
+                    "stops": stop_context(index, v, now), "next_run": next_run(index, v, now, self.system_id)})
             result = {"vehicles": enriched, "count": len(enriched), "feed_timestamp": self.feed_timestamp,
                       "fetched_at": self.fetched_at, "revision": self.revision,
                       "poll_seconds": POLL_SECONDS, "metadata_ready": bool(index["routes"]),
@@ -873,13 +1098,13 @@ class Tracker:
             index = self.index
             rows = index.get("stops", {})
             bounds = SYSTEMS[self.system_id]["bounds"]
-            # Chilliwack includes FVX and surrounding communities; keep its
-            # stop catalogue geographically limited to this transit view.
+            visible = self._view_stops()
             result = [[sid, vals[0], vals[1], vals[2]] for sid, vals in rows.items()
                       if isinstance(vals, (tuple, list)) and len(vals) >= 3
                       and bounds[0] <= vals[1] <= bounds[1]
-                      and bounds[2] <= vals[2] <= bounds[3]]
-            return {"system": self.system_id, "ready": bool(rows),
+                      and bounds[2] <= vals[2] <= bounds[3]
+                      and (visible is None or sid in visible)]
+            return {"system": self.system_id, "ready": bool(result),
                     "updated_at": index.get("updated_at"), "stops": result}
 
     def nearby_departures(self, stop_ids: list[str], now_ts: int | None = None) -> dict[str, Any]:
@@ -897,6 +1122,8 @@ class Tracker:
             if self._stop_timetable_index is None:
                 by_stop = defaultdict(list)
                 for trip_id, stops in index.get('trip_stops', {}).items():
+                    if not trip_in_view(self.system_id, index, trip_id):
+                        continue
                     for row in stops:
                         if len(row) < 4:
                             continue
@@ -908,6 +1135,7 @@ class Tracker:
             feed_stamp = self.trip_feed_timestamp or self.trip_feed_fetched_at
             feed_fresh = bool(feed_stamp and abs(now_ts - feed_stamp) <= 180)
             updates = self.trip_updates if feed_fresh else {}
+            visible_stops = self._view_stops()
             results = []
             # Include the previous service day for >24h GTFS stop times and the
             # following service day when viewing just before midnight.
@@ -915,12 +1143,14 @@ class Tracker:
                      for delta in (-1, 0, 1)]
             for sid in ids:
                 stop = index.get('stops', {}).get(sid)
-                if not stop:
+                if not stop or (visible_stops is not None and sid not in visible_stops):
                     results.append({'stop_id':sid,'name':'Unknown stop','arrivals':[],'status':'unknown_stop'})
                     continue
                 upcoming = {}
                 for trip_id, sec in table.get(sid, []):
                     trip = index.get('trips', {}).get(trip_id, {})
+                    if not trip_in_view(self.system_id, index, trip_id):
+                        continue
                     service_id = trip.get('service_id')
                     if not service_id:
                         continue
@@ -938,6 +1168,8 @@ class Tracker:
                 for trip_id, update in updates.items():
                     stamp = update.get('timestamp') or feed_stamp
                     if not stamp or abs(now_ts - stamp) > 180:
+                        continue
+                    if not trip_in_view(self.system_id, index, trip_id):
                         continue
                     trip = index.get('trips', {}).get(trip_id, {})
                     route = index.get('routes', {}).get(trip.get('route_id'), {})
@@ -982,7 +1214,8 @@ class Tracker:
         not a scheduled time masquerading as realtime.
         """
         with self.lock:
-            if stop_id not in self.index.get("stops", {}):
+            visible = self._view_stops()
+            if stop_id not in self.index.get("stops", {}) or (visible is not None and stop_id not in visible):
                 return {"stop_id":stop_id,"status":"unknown_stop","arrivals":[]}
             updates = self.trip_updates
             index = self.index
@@ -993,6 +1226,8 @@ class Tracker:
                 return {"stop_id":stop_id,"status":"stale","arrivals":[]}
             matches = []
             for trip_id, update in updates.items():
+                if not trip_in_view(self.system_id, index, trip_id):
+                    continue
                 updated = update.get("timestamp") or stamp
                 if abs(now - updated) > 180:
                     continue
@@ -1042,7 +1277,7 @@ class Tracker:
         with self.lock:
             index = self.index
             trip = index["trips"].get(trip_id)
-            if not trip:
+            if not trip or not trip_in_view(self.system_id, index, trip_id):
                 return None
             route = index["routes"].get(trip["route_id"], {})
             rows = index.get("trip_stops", {}).get(trip_id, [])
@@ -1251,7 +1486,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header("Cache-Control", "no-store")
         if not path.startswith("/api/") and path != "/config.js":
             # The SW owns immutable versioned app files; avoid stale HTML/manifest.
-            if path in ("/", "/index.html", "/sw.js", "/manifest.webmanifest"):
+            if path in ("/", "/index.html", "/fleet-gallery.html", "/sw.js", "/manifest.webmanifest"):
                 self.send_header("Cache-Control", "no-cache, must-revalidate")
             elif path in ("/pwa.js", "/app.js", "/style.css", "/classic.css", "/classic-dark.css", "/mobile.css", "/v27.css", "/v28.css", "/v30.css", "/v30b.css", "/v30rc.css", "/config.js"):
                 self.send_header("Cache-Control", "no-cache")

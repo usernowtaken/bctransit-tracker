@@ -7,9 +7,10 @@
     victoria: {name:'Greater Victoria', center:{lat:48.48, lon:-123.49, zoom:10}, shortcuts:['4','14','50','95']},
     chilliwack: {name:'Chilliwack / FVX', center:{lat:49.157, lon:-121.951, zoom:11}, shortcuts:['51','52','53','66']},
     kelowna: {name:'Kelowna', center:{lat:49.887, lon:-119.496, zoom:11}, shortcuts:['1','8','97']},
+    cowichan: {name:'Cowichan Valley', center:{lat:48.790, lon:-123.708, zoom:10}, shortcuts:['2','4','7','66','99']},
   };
   const DEFAULT_SYSTEM = 'victoria';
-  const MODEL_ASSETS = new Set(['vicinity30','nova_gen2','nova_gen3','nova_gen4','nova_lfse','light_duty','xn40','xe40','enviro500','enviro500mmc','generic']);
+  const MODEL_ASSETS = new Set(['vicinity30','vicinity30cng','vicinity35','vicinity_2013','nova_gen2','nova_gen3','nova_gen4','nova_lfse','light_duty','xn40','xe40','enviro500','enviro500mmc','generic']);
   // NovaBus *generations* are independent of which reference illustration is displayed.
   const NOVA_GENERATION_FILTERS = Object.freeze({nova_gen2:2,nova_gen3:3,nova_gen4:4});
   // Every illustration below is an EXACT pixel crop from the uploaded full.png.
@@ -17,6 +18,13 @@
   // Multiple liveries are preferences, not evidence of the physical bus's current paint.
   const BUS_ART = Object.freeze({
     vicinity30: [{id:'vicinity30', name:'Vehicle illustration'}],
+    vicinity30cng: [{id:'vicinity30', name:'Vicinity 30′ reference drawing'}],
+    vicinity35: [{id:'vicinity35', name:'Vicinity 35′ illustration'}],
+    vicinity_2013: [{id:'vicinity35', name:'Vicinity 35′ reference drawing for 2013 Yaxing / early Vicinity'}],
+    light_duty: [
+      {id:'handydart_old', name:'Older HandyDART / light-duty reference image'},
+      {id:'handydart_new', name:'Newer HandyDART / light-duty reference image'}
+    ],
     nova2: [{id:'nova2', name:'Vehicle illustration'}],
     nova3: [{id:'nova3', name:'Vehicle illustration'}],
     nova_lfse: [{id:'nova_lfse', name:'NovaBus LFSe+ electric illustration'}],
@@ -52,10 +60,10 @@
     '9434': 'smart', // Documented 2012 Smart Bus prototype, full-length fairings.
   });
   const isNova2009 = (vehicle) => {
-    if (state.system !== 'victoria') return false;
     const fleet = String(vehicle?.fleet_number ?? '');
     if (!/^\d{4}$/.test(fleet)) return false;
-    return Number(fleet) >= 9319 && Number(fleet) <= 9433 && vehicle?.model_key === 'nova2';
+    return Number(fleet) >= 9319 && Number(fleet) <= 9433 &&
+      (vehicle?.model_key === 'nova2' || (vehicle?.model_key === 'nova3' && Number(vehicle?.nova_generation) === 3));
   };
   const novaRearStyle = (vehicle) => {
     if (!isNova2009(vehicle)) return null;
@@ -88,6 +96,29 @@
   // remain flat. No cycling and no extra image requests.
   const isUnverifiedNova = () => false;
   const busArtVariant = (vehicle) => {
+    // Only genuinely unsupplied regional models should remain
+    // PLACEHOLDER / N/A rather than borrowing the wrong drawing.
+    // All regional Gen 4 Nova buses use the supplied Gen 3 drawing as a
+    // reference image, WITHOUT changing their Gen 4 model identification.
+    // An illustration is not proof of a bus's exact body configuration.
+    if (state.system !== 'victoria') {
+      if (vehicle?.model_key === 'generic') return null;
+      if (vehicle?.model_key === 'light_duty') {
+        const fleet = String(vehicle?.fleet_number ?? '');
+        const newer = (state.system === 'kelowna' && fleet === '2922') ||
+          (state.system === 'cowichan' && /^284[2-4]$/.test(fleet));
+        return newer
+          ? BUS_ART.light_duty.find(v => v.id === 'handydart_new')
+          : BUS_ART.light_duty.find(v => v.id === 'handydart_old');
+      }
+      if (vehicle?.model_key === 'nova3' && Number(vehicle?.nova_generation) === 4) {
+        return {id:'nova3', name:'Gen 3 reference drawing (Gen 4 model; not exact artwork)'};
+      }
+      // The provided XN40 CNG drawing is suitable as a general model reference
+      // for Central Fraser Valley XN40s; Victoria's batch/livery logic is unchanged.
+      if (vehicle?.model_key === 'xn40')
+        return BUS_ART.xn40.find(v => v.id === 'xn40_cng') || null;
+    }
     // Unique photographed Smart LFS prototype (2012). No other bus uses its art.
     if (state.system === 'victoria' && String(vehicle?.fleet_number) === '9434' && vehicle?.model_key === 'nova3') {
       return {id:'nova_smart', name:'2012 Smart LFS prototype illustration'};
@@ -222,7 +253,11 @@
   function safe(value) {
     return String(value ?? '').replace(/[&<>"']/g, (s) => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[s]));
   }
+  function genericNis(vehicle) {
+    return vehicle?.service_inference?.state === 'likely_nis';
+  }
   function mapLabel(vehicle) {
+    if (genericNis(vehicle)) return 'NIS~';
     const state = vehicle?.route_proximity?.state;
     if (state === 'likely_nis') return 'NIS~';
     if (state === 'possible_nis') return 'NIS?';
@@ -233,6 +268,7 @@
     const status = vehicle?.route_proximity?.state;
     return status === 'likely_nis' || status === 'possible_nis' || status === 'far';
   }
+  function serviceWarning(vehicle) {return genericNis(vehicle) || routeWarning(vehicle);}
   function label(route) { return String(route || '?').slice(0, 7); }
   function timeAgo(timestamp) {
     if (typeof timestamp !== 'number' || timestamp <= 0) return 'Unknown';
@@ -247,7 +283,7 @@
       if (needle) {
         const proximity = v.route_proximity?.state;
         if (needle === 'NIS' || needle === 'NIS?') {
-          if (!['possible_nis','likely_nis'].includes(proximity)) return false;
+          if (!genericNis(v) && !['possible_nis','likely_nis'].includes(proximity)) return false;
         } else if (needle === 'OFF' || needle === 'OFF?') {
           if (!routeWarning(v)) return false;
         } else if (!(String(v.route || '').toUpperCase().startsWith(needle)
@@ -263,7 +299,7 @@
       const proximity = v.route_proximity?.state;
       switch (state.serviceFilter) {
         case 'near': return proximity === 'near';
-        case 'off': return routeWarning(v);
+        case 'off': return serviceWarning(v);
         case 'stale': return ageSeconds(v) > freshnessThreshold;
         case 'unknown': return !v.route || proximity === 'unknown';
         default: return true;
@@ -309,7 +345,8 @@
     $('routeCount').textContent = state.data
       ? new Set(state.vehicles.map((v) => v.route).filter(Boolean)).size.toLocaleString()
       : '—';
-    $('refreshNote').textContent = `Source: ~${state.data?.poll_seconds || 15}s · Browser: ${state.lowBandwidth ? 25 : mobile() ? 10 : 5}s`;
+    $('refreshNote').textContent = `GPS refresh: ~${state.data?.poll_seconds || 15}s`;
+    $('statusPill').title += ` · Source interval ~${state.data?.poll_seconds || 15}s`;
     if (state.selected && (!mobile() || !state.closed)) updateDetails();
   }
   function displayName(vehicle) {
@@ -326,16 +363,17 @@
     const filtered = sortedVehicles();
     $('listHeading').textContent = state.query ? `Buses matching “${state.query}”` : 'Active buses';
     $('resultCount').textContent = filtered.length.toLocaleString();
-    let hint = 'Showing the latest available vehicle positions.';
+    let hint = ''; 
     if (!state.data) hint = 'Connecting to the live feed…';
     else if (state.data.error || state.clientError) hint = 'Live feed unavailable. Showing last received positions, if any.';
     else if (state.restoredCache) hint = 'Previously cached positions; checking for new data…';
     else if (state.data.fetched_at && !state.data.metadata_ready)
       hint = 'Loading route numbers from schedule data. Some routes may show “?”.';
     $('listHint').textContent = hint;
+    $('listHint').hidden = !hint;
     // Skip needless DOM churn when GPS coordinates change but fleet list text doesn't.
     // Still refresh when the displayed GPS-age bucket changes.
-    const signature = `${state.system}|${state.groupMode}|${state.density}|${[...state.expandedGroups].join(',')}|${state.query}|${state.sortBy}|${state.serviceFilter}|${state.modelFilter}|${state.userLocation?.lat ?? ''}|${state.userLocation?.lon ?? ''}|${state.selected}|${filtered.length}|${filtered.slice(0, MAX_LIST).map(v => [v.id, v.route, v.headsign, v.label, v.fleet_number, v.model_key, v.route_proximity?.state, Math.floor(Number(v.timestamp || 0)/60)].join(':')).join('|')}`;
+    const signature = `${state.system}|${state.groupMode}|${state.density}|${[...state.expandedGroups].join(',')}|${state.query}|${state.sortBy}|${state.serviceFilter}|${state.modelFilter}|${state.userLocation?.lat ?? ''}|${state.userLocation?.lon ?? ''}|${state.selected}|${filtered.length}|${filtered.slice(0, MAX_LIST).map(v => [v.id, v.route, v.headsign, v.label, v.fleet_number, v.model_key, v.route_proximity?.state, v.service_inference?.state, Math.floor(Number(v.timestamp || 0)/60)].join(':')).join('|')}`;
     if (signature === lastListSignature && hint === lastListStatus) return;
     lastListSignature = signature;
     lastListStatus = hint;
@@ -349,14 +387,14 @@
       button.type = 'button';
       button.className = `bus-item${state.selected === vehicle.id ? ' selected' : ''}`;
       button.setAttribute('role', 'listitem');
-      button.setAttribute('aria-label', `${routeWarning(vehicle) ? 'Possibly off scheduled route, ' : ''}reported route ${label(vehicle.route)}, ${displayName(vehicle)}, vehicle ${vehicle.id}`);
+      button.setAttribute('aria-label', `${genericNis(vehicle) ? 'Likely not in service from generic route label, ' : routeWarning(vehicle) ? 'Possibly off scheduled route, ' : ''}reported route ${label(vehicle.route)}, ${displayName(vehicle)}, vehicle ${vehicle.id}`);
       const badge = document.createElement('span');
       badge.className = 'bus-route'; badge.textContent = mapLabel(vehicle);
-      badge.classList.toggle('offroute', routeWarning(vehicle));
+      badge.classList.toggle('offroute', serviceWarning(vehicle));
       badge.style.borderLeft = `3px solid ${routeColor(vehicle)}`;
       const meta = document.createElement('span'); meta.className = 'bus-meta';
       const name = document.createElement('span'); name.className = 'bus-name';
-      name.textContent = routeWarning(vehicle) ? `Reported ${label(vehicle.route)} · ${displayName(vehicle)}` : displayName(vehicle);
+      name.textContent = genericNis(vehicle) ? `Likely NIS · ${displayName(vehicle)}` : routeWarning(vehicle) ? `Reported ${label(vehicle.route)} · ${displayName(vehicle)}` : displayName(vehicle);
       const extra = document.createElement('span'); extra.className = 'bus-extra';
       extra.textContent = state.sortBy === 'nearest' && state.userLocation
         ? `${distanceLabel(localDistance(vehicle))} away · ${vehicle.fleet_number ? `Fleet #${vehicle.fleet_number}` : `GPS ${timeAgo(vehicle.timestamp)}`}`
@@ -459,9 +497,10 @@
         : victoria && model==='xe40'
           ? ['USB charging','Included in BC Transit electric-bus equipment plans; individual bus not checked','fleet']
           : ['USB charging','Not verified for this fleet number','unknown'];
-    const lcd = model==='vicinity30' || (victoria && fleet===1192)
-      ? ['NextRide LCD screen','Not listed for this bus; stop announcements may still be available','unknown']
-      : ['NextRide LCD screen','Expected on many newer buses; individual installation not confirmed','fleet'];
+    const lcd = model==='vicinity30' || model==='light_duty' || (victoria && fleet===1192)
+      ? ['NextRide LCD screen','Screen fitment not confirmed for this vehicle','unknown']
+      : victoria ? ['NextRide LCD screen','Expected on many newer Victoria buses; fitment may vary','fleet']
+      : ['NextRide LCD screen','Installation not independently verified for this regional fleet','unknown'];
     const entries=[usb,lcd,
       ['Audio stop announcements','NextRide-supported transit service; onboard operation may vary','fleet'],
       ['Accessible boarding','BC Transit describes its fleet as accessible','confirmed'],
@@ -472,7 +511,7 @@
       const item=document.createElement('div');item.className='v33-amenity';
       const head=document.createElement('strong');head.textContent=title;
       const chip=document.createElement('small');chip.className='v33-amenity-status '+status;
-      chip.textContent=status==='confirmed'?'Fleet feature':status==='fleet'?'Varies / likely':'Not verified';
+      chip.textContent=status==='confirmed'?'Listed':status==='fleet'?'May vary':'Unknown';
       const note=document.createElement('span');note.textContent=description;
       item.append(head,chip,note);host.append(item);
     }
@@ -487,7 +526,7 @@
     $('detailTitle').textContent = vehicle.route ? `Route ${vehicle.route}` : 'Route unavailable';
     $('detailDestination').textContent = displayName(vehicle);
     const fleetNumber = vehicle.fleet_number;
-    $('detailFleet').textContent = fleetNumber ? `Bus #${fleetNumber}` : 'Fleet number unavailable';
+    $('detailFleet').textContent = fleetNumber ? `Bus #${fleetNumber}` : 'Bus number unknown';
     $('detailFleetConfidence').textContent = fleetNumber ? '' : 'Fleet number unavailable';
     $('detailFleetConfidence').hidden = Boolean(fleetNumber);
     const smart9434 = state.system === 'victoria' && String(fleetNumber) === '9434' && vehicle.model_key === 'nova3';
@@ -497,17 +536,17 @@
     smartPanel.hidden = !smart9434;
     $('fleetProfile').classList.toggle('smart-prototype', smart9434);
     const bodyVariant = $('detailNovaBody');
-    const body = vehicle.nova_body_variant || (state.system === 'victoria' ? VERIFIED_NOVA_BODY[String(fleetNumber)] : null);
+    const body = vehicle.nova_body_variant || VERIFIED_NOVA_BODY[String(fleetNumber)] || null;
     const nova2009 = isNova2009(vehicle);
     let bodyText = '';
-    if (body === 'raised') bodyText = String(fleetNumber) === '9426' ? 'Raised rear · white LED sign (photographed)' : 'Raised rear · photographed fleet unit';
-    else if (body === 'flat') bodyText = 'Flat rear · photographed fleet unit';
-    else if (body === 'smart') bodyText = 'Full-length roof fairings · 2012 Smart Bus prototype';
-    else if (nova2009) bodyText = 'Rear roof unverified · raised-rear illustration shown by default';
+    if (body === 'raised') bodyText = String(fleetNumber) === '9426' ? 'Raised roof · white LEDs' : 'Raised roof';
+    else if (body === 'flat') bodyText = 'Flat roof';
+    else if (body === 'smart') bodyText = ''; // Dedicated prototype card above already explains this.
+    else if (nova2009) bodyText = ''; // Avoid repeating the illustration policy in the main profile.
     // Barp's 2009 Victoria gallery documents frameless windows on the 9354+ order.
     const fleetAsNumber = Number(fleetNumber);
     if (nova2009 && fleetAsNumber >= 9354 && fleetAsNumber <= 9433) {
-      bodyText += ' · frameless windows (9354+ batch)';
+      // The fleet-generation note remains available in the technical source data.
     }
     bodyVariant.hidden = !bodyText;
     bodyVariant.textContent = bodyText;
@@ -534,22 +573,25 @@
     const chosenArt = busArtVariant(vehicle);
     const noImage = $('fleetNoImage');
     const isSmallBus = vehicle.model_key === 'light_duty';
-    artContainer.hidden = !chosenArt && !isSmallBus;
-    noImage.hidden = !isSmallBus;
+    // Show an explicit placeholder even for known models missing supplied art.
+    // Do not silently omit the photo area or borrow a different model's image.
+    artContainer.hidden = false;
+    noImage.hidden = Boolean(chosenArt);
+    noImage.textContent = 'PLACEHOLDER / N/A';
     if (chosenArt) {
       const manualArt = variants.find(v => v.id === artChoices[artKey(vehicle)]);
       artSelect.value = vehicle.model_key === 'xn40' && !manualArt ? 'auto' : chosenArt.id;
-      const source = '/buses/' + chosenArt.id + '.png?v=3.4.1';
+      const source = '/buses/' + chosenArt.id + '.png?v=3.4.11';
       if (busImage.getAttribute('src') !== source) busImage.src = source;
       busImage.hidden = false;
       busImage.alt = `${vehicle.model || 'Bus'} — vehicle illustration (${chosenArt.name})`;
       noImage.hidden = true;
-      busImage.onerror = () => { if (busImage.getAttribute('src') === source) { busImage.hidden = true; noImage.hidden = false; noImage.textContent = 'NO IMAGE'; } };
+      busImage.onerror = () => { if (busImage.getAttribute('src') === source) { busImage.hidden = true; noImage.hidden = false; noImage.textContent = 'PLACEHOLDER / N/A'; } };
       busImage.onload = () => { if (busImage.getAttribute('src') === source) { busImage.hidden = false; noImage.hidden = true; } };
     } else {
       busImage.hidden = true; // Never use another vehicle's drawing as a substitute.
       busImage.removeAttribute('src');
-      noImage.textContent = 'NO IMAGE';
+      noImage.textContent = 'PLACEHOLDER / N/A';
     }
     // Roof styles are automatic: verified examples fixed, unknown 2009 units alternating.
     const proximity = vehicle.route_proximity || {};
@@ -558,7 +600,11 @@
     const observedDistance = Number.isFinite(proximity.distance_m)
       ? `${proximity.distance_m.toLocaleString()} m from scheduled route line` : '';
     proximityStatus.className = 'proximity-status';
-    if (proximity.state === 'likely_nis') {
+    if (genericNis(vehicle)) {
+      proximityStatus.textContent = 'Likely NIS · generic route label';
+      proximityStatus.classList.add('warning');
+      proximityNote.textContent = `${vehicle.service_inference.basis}. Reported route ${label(vehicle.route)}; not a confirmed destination-sign or operator status. ${observedDistance ? observedDistance+'.' : ''}`;
+    } else if (proximity.state === 'likely_nis') {
       proximityStatus.textContent = 'Likely NIS / deadheading · inferred';
       proximityStatus.classList.add('warning');
       proximityNote.textContent = `${observedDistance}. Off-route in at least three distinct GPS fixes over 45+ seconds. Route ${label(vehicle.route)} is still the reported assignment. This is NOT confirmation of the actual destination sign or service status.`;
@@ -584,7 +630,13 @@
     $('detailAge').textContent = timeAgo(vehicle.timestamp);
     updateMotionLabel(vehicle);
     $('detailSpeed').textContent = Number.isFinite(vehicle.speed_mps) ? `${Math.round(vehicle.speed_mps * 3.6)} km/h` : 'Not provided';
-    $('detailBearing').textContent = Number.isFinite(vehicle.bearing) ? `${Math.round(vehicle.bearing)}°` : 'Not provided';
+    const shapeHeading = String(vehicle.bearing_basis || '').startsWith('Ordered GTFS trip shape');
+    $('detailBearing').textContent = Number.isFinite(vehicle.display_bearing)
+      ? `${Math.round(vehicle.display_bearing)}° · ${shapeHeading ? 'route-aligned estimate' : 'GPS'}`
+      : 'Not provided';
+    $('detailBearing').title = shapeHeading && Number.isFinite(vehicle.bearing)
+      ? `GPS feed: ${Math.round(vehicle.bearing)}°. Visual arrow uses ordered-trip geometry.`
+      : 'As reported by the vehicle feed';
     $('detailLat').textContent = Number(vehicle.lat).toFixed(5);
     $('detailLon').textContent = Number(vehicle.lon).toFixed(5);
     $('detailTrip').textContent = vehicle.trip_id || 'Unavailable';
@@ -596,23 +648,24 @@
     const context = vehicle.stops || {};
     $('detailPreviousStop').textContent = context.previous?.name || 'Unknown';
     $('detailNextStop').textContent = context.next?.name || 'Unknown';
-    $('detailStopBasis').textContent = (context.basis === 'unavailable' ? 'No stop position information available' : (context.basis || 'Unavailable')) + (routeWarning(vehicle) ? ' · Caution: reported stop progress may not reflect this GPS position.' : '');
+    $('detailStopBasis').textContent = routeWarning(vehicle) ? 'Stop progress may be inaccurate (off-route).' : '';
+    $('detailStopBasis').hidden = !routeWarning(vehicle);
     const next = vehicle.next_run;
     if (next) {
       const nextLabel = next.route ? `Route ${next.route}` : 'Next scheduled trip';
       $('detailRouteChange').textContent = `${nextLabel}${next.headsign ? ` · ${next.headsign}` : ''}`;
-      $('detailRouteChangeNote').textContent = `${next.different_route ? 'Possible route change' : 'Same route, next trip'} at ${next.starts_at} · Scheduled only; not confirmed${routeWarning(vehicle) ? ' · Vehicle appears off its assigned trip, so this prediction may not apply' : ''}`;
+      $('detailRouteChangeNote').textContent = `Scheduled ${next.starts_at} · unconfirmed${routeWarning(vehicle) ? ' · off route' : ''}`;
       $('detailRouteChange').style.color = state.theme === 'classic' ? '#1664bb' : '#8ab4f8';
     } else {
       $('detailRouteChange').textContent = 'Not determinable';
       $('detailRouteChangeNote').textContent = vehicle.block_id
-        ? 'No safe next-trip match in the published schedule for this service day.'
-        : 'No GTFS vehicle block is available. We will not guess the next route.';
+        ? 'No other route scheduled today.'
+        : 'Next route unavailable.';
       $('detailRouteChange').style.color = '';
     }
     $('detailOverlayStatus').textContent = !vehicle.trip_id ? 'Live feed has no trip ID for this bus' :
       state.routeTrip === vehicle.trip_id ? $('detailOverlayStatus').textContent : 'Retrieving route line and stop locations…';
-    $('followButton').textContent = `Follow vehicle: ${state.following ? 'ON' : 'OFF'}`;
+    $('followButton').textContent = state.following ? '✓ Following' : 'Follow';
     $('followButton').classList.toggle('on', state.following);
   }
   function historyTime(timestamp) {
@@ -835,7 +888,7 @@
     state.selected = null;
     state.following = false;
     state.routeRequestSerial++;
-    state.nextTripRequestSerial++;state.nextTripOverlayKey=null;state.nextRouteLayer?.clearLayers();$('nextTripLegend').hidden=true;
+    state.nextTripRequestSerial++;state.nextTripOverlayKey=null;state.nextRouteLayer?.clearLayers();
     state.routeDetail = null;
     state.stopMarkers.clear();
     state.arrivals = new Map();
@@ -857,6 +910,12 @@
     renderMap();
     renderList();
     updateMobileOpenLabel();
+  }
+  function returnToRouteList() {
+    if(state.selected)leaveDetails();
+    setSheetMode('half');
+    setSidebar(true);
+    if(!mobile())$('routeSearch').focus({preventScroll:true});
   }
   function setFilter(query) {
     state.query = query.trim().toUpperCase().slice(0, 12);
@@ -881,9 +940,9 @@
     const text = safe(mapLabel(vehicle));
     const colored = selected || (state.query && String(vehicle.route || '').toUpperCase().startsWith(state.query));
     const color = routeColor(vehicle);
-    const bearing = Number.isFinite(vehicle.bearing) ? vehicle.bearing : null;
+    const bearing = Number.isFinite(vehicle.display_bearing) ? vehicle.display_bearing : Number.isFinite(vehicle.bearing) ? vehicle.bearing : null;
     const arrow = bearing === null ? '' : `<span class="heading-ring" style="--heading:${Math.round(bearing)}deg"><span class="heading-tip"></span></span>`;
-    const warning = routeWarning(vehicle) ? ` possible-offroute ${vehicle.route_proximity.state}` : '';
+    const warning = serviceWarning(vehicle) ? ` possible-offroute ${genericNis(vehicle) ? 'likely_nis' : vehicle.route_proximity.state}` : '';
     const html = `<div class="bus-marker v2-marker ${selected ? 'selected' : ''} ${colored ? 'route-colored' : ''}${warning}" style="--route-color:${color}" title="${warning ? safe(`Reported route ${label(vehicle.route)}; possible off-route`) : safe(`Route ${label(vehicle.route)}`)}">${arrow}<span class="marker-label">${text}</span></div>`;
     return L.divIcon({className:'vehicle-icon',html,iconSize:mobile() ? [54,50] : [46,38],iconAnchor:mobile() ? [27,26] : [23,20]});
   }
@@ -920,7 +979,8 @@
     const key=`${state.system}:${v.id}`;
     let tracker=state.motionTracks.get(key);
     if(!tracker){tracker=new window.BusRadarMotion.Tracker(state.system);state.motionTracks.set(key,tracker);}
-    tracker.ingest(v,Date.now(),state.system);
+    const displayHeading = Number.isFinite(v.display_bearing) ? v.display_bearing : v.bearing;
+    tracker.ingest({...v,bearing:displayHeading},Date.now(),state.system);
     if(state.motionTracks.size>45)state.motionTracks.delete(state.motionTracks.keys().next().value);
     return tracker;
   }
@@ -935,10 +995,9 @@
   function updateMotionLabel(v) {
     const el=$('motionStatus');if(!el || !v)return;
     const active=selectedMotionSample(v);
-    el.textContent=active?.reconciling?'Smoothing toward a new GPS fix · actual GPS '+timeAgo(v.timestamp):
-      active?.held?'Short movement estimate held · actual GPS '+timeAgo(v.timestamp):
-      active?.estimated?'Visual motion estimate — not a new GPS report · actual GPS '+timeAgo(v.timestamp):
-      'Marker uses the last reported GPS fix · '+timeAgo(v.timestamp);
+    const estimated = Boolean(active?.reconciling || active?.estimated);
+    el.hidden = !estimated;
+    el.textContent = estimated ? `Estimated position · GPS ${timeAgo(v.timestamp)}` : '';
   }
   function updateSelectedMotion() {
     if (document.visibilityState!=='visible'||!state.map||!state.selected)return;
@@ -961,7 +1020,7 @@
       keep.add(item.key);
       const selected = item.type === 'bus' && item.vehicle.id === state.selected;
       const sig = item.type === 'bus'
-        ? `b:${mapLabel(item.vehicle)}:${Math.round(item.vehicle.bearing || 0)}:${routeColor(item.vehicle)}:${selected}:${state.query}:${state.markerSize}`
+        ? `b:${mapLabel(item.vehicle)}:${Math.round(item.vehicle.display_bearing ?? item.vehicle.bearing ?? 0)}:${routeColor(item.vehicle)}:${selected}:${state.query}:${state.markerSize}`
         : `c:${item.count}`;
       let record = state.markers.get(item.key);
       if (!record) {
@@ -1126,7 +1185,7 @@
     state.nextTripOverlayKey=key;
     const serial=++state.nextTripRequestSerial;
     state.nextRouteLayer?.clearLayers();
-    $('nextTripLegend').hidden=true;
+
     const status=$('nextTripOverlayStatus');
     if (!visible) {status.textContent=trip?'Next scheduled route hidden':'No next scheduled trip to draw';return;}
     status.textContent='Loading dashed next-trip line (scheduled only)…';
@@ -1145,7 +1204,7 @@
       L.polyline(points,{color,weight:6,opacity:0.25,dashArray:'11 12',interactive:false,className:'v34-next-route'}).addTo(state.nextRouteLayer);
       L.polyline(points,{color,weight:3,opacity:0.60,dashArray:'5 13',interactive:false,className:'v34-next-route'}).addTo(state.nextRouteLayer);
       status.textContent=`Dashed line: next scheduled Route ${vehicle.next_run.route||'?'}${detail.headsign?' · '+detail.headsign:''} · not confirmed`;
-      $('nextTripLegend').hidden=false;
+  
     } catch(e){if(serial===state.nextTripRequestSerial) status.textContent='Next scheduled route geometry unavailable';}
   }
   async function loadSelectedRoute(vehicle) {
@@ -1194,7 +1253,7 @@
         }
       }
       $('detailOverlayStatus').textContent = points.length > 1
-        ? `${detail.stops?.length || 0} stops · Click any stop on the map to view its arrival time`
+        ? ''
         : 'No route shape published for this trip; showing stops where available';
       updateStopInterfaces();
     };
@@ -1309,8 +1368,8 @@
     state.historyLayer = L.layerGroup().addTo(map);
   }
   function updateMobileOpenLabel() {
-    $('mobileOpenText').textContent = state.selected ? 'Bus details' : 'Routes';
-    $('mobileOpen').setAttribute('aria-label', state.selected ? 'Show selected bus details' : 'Open route search and bus list');
+    $('mobileOpenText').textContent = state.selected ? '← Routes' : 'Routes';
+    $('mobileOpen').setAttribute('aria-label', state.selected ? 'Return to route search and active buses' : 'Open route search and bus list');
   }
   function setSheetMode(mode) {
     state.sheetMode = mode === 'full' ? 'full' : 'half';
@@ -1445,7 +1504,7 @@
   const isSavedBus = v => state.favorites.buses.some(x => x.id === String(v.id) || (x.fleet && x.fleet === String(v.fleet_number||'')));
   const busFavouriteKey = v => String(v.fleet_number||v.id);
   function updateFavoriteBusButton(vehicle) {
-    $('favoriteBusButton').textContent = isSavedBus(vehicle) ? '★ Saved bus — remove' : '☆ Save this bus';
+    $('favoriteBusButton').textContent = isSavedBus(vehicle) ? '★ Saved' : '☆ Save bus';
   }
   function toggleFavoriteBus(vehicle) {
     if (!vehicle) return;
@@ -1475,7 +1534,7 @@
   function vehicleShareLink(vehicle) {
     const link = new URL(location.href);link.search='';link.hash='';
     link.searchParams.set('system',state.system);
-    if (state.system === 'victoria' && /^\d{4}$/.test(String(vehicle.fleet_number||''))) link.searchParams.set('fleet',String(vehicle.fleet_number));
+    if (/^\d{4}$/.test(String(vehicle.fleet_number||''))) link.searchParams.set('fleet',String(vehicle.fleet_number));
     else link.searchParams.set('vehicle',String(vehicle.id));
     return link.href;
   }
@@ -1511,7 +1570,7 @@
     const system=state.system;
     showSharedMessage('Bus not currently reporting','Checking the last 24 hours of saved GPS history…');
     try {
-      const extras=target.fleet && system==='victoria' ? {fleet:target.fleet} : {vehicle_id:target.vehicle};
+      const extras=target.fleet ? {fleet:target.fleet} : {vehicle_id:target.vehicle};
       if(!extras.fleet && !extras.vehicle_id)throw new Error('No vehicle identifier');
       const res=await fetch(apiPath('last-known',extras),{cache:'no-store'});
       if(!res.ok)throw new Error('History unavailable');
@@ -1526,7 +1585,7 @@
     const params=new URLSearchParams(location.search),system=params.get('system');
     if(!system || !Object.hasOwn(SYSTEMS,system))return null;
     const fleet=params.get('fleet'), vehicle=params.get('vehicle');
-    if (fleet && system==='victoria' && /^\d{4}$/.test(fleet)) return {system,fleet,vehicle:null,checked:false};
+    if (fleet && /^\d{4}$/.test(fleet)) return {system,fleet,vehicle:null,checked:false};
     if (vehicle && vehicle.length<=128) return {system,fleet:null,vehicle,checked:false};
     return null;
   }
@@ -1548,11 +1607,11 @@
   function renderAlerts(hostId,vehicle){
     const host=$(hostId);host.replaceChildren();
     const payload=alertsCache.get(state.system)?.data;
-    if(!payload){host.textContent='Open this panel to load published service alerts.';return;}
+    if(!payload){host.textContent='Open to load alerts.';return;}
     if(!payload.ready){host.textContent='Service alerts unavailable ('+(payload.error||'source not responding')+').';return;}
     let alerts=Array.isArray(payload.alerts)?payload.alerts:[];
     if(vehicle) alerts=alerts.filter(a=>alertMatchesVehicle(a,vehicle));
-    if(!alerts.length){host.textContent=vehicle?'No matching alerts currently published for this vehicle.':'No active alerts in the published feed.';return;}
+    if(!alerts.length){host.textContent='No active alerts.';return;}
     for(const alert of alerts.slice(0,35)){
       const item=document.createElement('article');item.className='v31-alert-item';
       const title=document.createElement('strong');title.textContent=alert.title||'Service alert';item.append(title);
@@ -1631,7 +1690,7 @@
   function updateFavoriteRouteButton(route){
     const button=$('favoriteRouteButton');
     const available=Boolean(route && route!=='?');button.disabled=!available;
-    button.textContent=available ? (state.favorites.routes.includes(String(route))?'★ Favourite route — remove':'☆ Save Route '+route) : 'Route unavailable to save';
+    button.textContent=available ? (state.favorites.routes.includes(String(route))?'★ Route saved':'☆ Save route') : 'No route';
   }
   function renderFavorites(){
     const container=$('favoritesList');container.replaceChildren();
@@ -1762,7 +1821,7 @@
     const stops=stopCatalog.get(state.system);
     const pointerHint=touchScreen()?(state.customization.tapPreview?' · tap map to choose a different area':''):
       (state.customization.hoverPreview?' · hover on map to explore':' · pan the map to explore');
-    $('boardHint').textContent=origin.label+pointerHint;
+    $('boardHint').textContent=origin.label; // Map controls already explain hover/tap; avoid a second instruction line.
     if(!stops){host.textContent='Loading route and stop locations…';return;}
     const nearby=stops.map(stop=>({stop,distance:metersBetween(origin.lat,origin.lon,stop.lat,stop.lon)}))
       .sort((a,b)=>a.distance-b.distance).slice(0,10);
@@ -1784,7 +1843,7 @@
         directions.get(dest).push({...arrival,stop:entry.stop,distance:entry.distance});
       }
     }
-    if(!routes.size){const note=document.createElement('p');note.textContent='No scheduled departures found at nearby stops in the next 90 minutes. Try a different point on the map.';host.append(note);return;}
+    if(!routes.size){const note=document.createElement('p');note.textContent='No nearby departures in 90 min. Move the map to try another area.';host.append(note);return;}
     const sorted=[...routes].map(([route,directions])=>{
       for(const [dest,arrivals] of directions){
         arrivals.sort((a,b)=>a.distance-b.distance||a.arrival_at-b.arrival_at);
@@ -2107,7 +2166,7 @@
     state.nearbyStopToken++;
     state.boardSerial++;state.boardPending=false;state.boardQueued=false;state.boardPayload=null;state.boardAt=null;state.boardLastFetch=0;
     state.boardPointer=null;state.boardPointerMode=null;state.boardPointerMarker?.remove();state.boardPointerMarker=null;
-    state.nextTripRequestSerial++;state.nextTripOverlayKey=null;state.nextRouteLayer?.clearLayers();$('nextTripLegend').hidden=true;
+    state.nextTripRequestSerial++;state.nextTripOverlayKey=null;state.nextRouteLayer?.clearLayers();
     state.markers.forEach(r=>r.marker.remove()); state.markers.clear();
     if (state.routeLayer) state.routeLayer.clearLayers();
     state.routeTrip=null; state.routeDetail=null; state.routeMetadataStamp=null;
@@ -2118,7 +2177,7 @@
     catch (_) {state.query='';}
     $('systemSelect').value=value;
     $('regionName').textContent=SYSTEMS[value].name.toUpperCase();
-    $('alertsMainIntro').textContent=value==='chilliwack'?'Alert feed is shared with the wider Fraser Valley.':'Service alerts load only when this panel is opened.';
+    $('alertsMainIntro').textContent='';
     $('routeSearch').placeholder = 'Route, fleet #, or model';
     document.title=`${SYSTEMS[value].name} · Bus Radar`;
     readFavorites(); renderFavorites(); renderQuickRoutes(); setFilter(state.query);
@@ -2267,7 +2326,8 @@
         if (vehicle) loadSelectedRoute(vehicle);
       }
     });
-    $('detailBack').addEventListener('click', leaveDetails);
+    $('detailBack').addEventListener('click', returnToRouteList);
+    $('returnToRoutes').addEventListener('click', returnToRouteList);
     $('recenterButton').addEventListener('click', () => {
       const v = state.vehicles.find((p) => p.id === state.selected);
       if (v && state.map) state.map.setView([v.lat,v.lon], Math.max(state.map.getZoom(), 13),{animate:false});
@@ -2275,7 +2335,7 @@
     $('followButton').addEventListener('click', () => {state.following = !state.following;updateDetails();});
     $('themeToggle').addEventListener('click', () => setTheme(state.theme === 'classic' ? 'dark' : 'classic'));
     $('liteToggle').addEventListener('click', () => setLite(!state.lite));
-    $('mobileOpen').addEventListener('click', () => {setSheetMode('half'); setSidebar(true);});
+    $('mobileOpen').addEventListener('click', () => {if(state.selected) leaveDetails();setSheetMode('half'); setSidebar(true);});
     let dragStart = null;
     const handle = $('sheetHandle');
     handle.addEventListener('pointerdown', (event) => {
@@ -2293,11 +2353,12 @@
     });
     handle.addEventListener('pointercancel', () => {dragStart = null;});
     $('resetView').addEventListener('click', () => state.map?.setView([currentView().lat,currentView().lon],currentView().zoom,{animate:false}));
-    $('menuToggle').addEventListener('click', () => setSidebar(state.closed));
+    $('menuToggle').addEventListener('click', () => {if(state.selected) returnToRouteList();else setSidebar(state.closed);});
     $('sidebarClose').addEventListener('click', () => setSidebar(false));
     document.addEventListener('keydown', (event) => {
       if (event.key === '/' && event.target.tagName !== 'INPUT') {
         event.preventDefault();
+        if(state.selected)leaveDetails();
         setSidebar(true);
         $('routeSearch').focus();
       }
@@ -2316,7 +2377,7 @@
     if(share){state.system=share.system;state.pendingShare=share;}
     $('systemSelect').value=state.system;
     $('regionName').textContent=SYSTEMS[state.system].name.toUpperCase();
-    $('alertsMainIntro').textContent=state.system==='chilliwack'?'Alert feed is shared with the wider Fraser Valley.':'Service alerts load only when this panel is opened.';
+    $('alertsMainIntro').textContent='';
     $('routeSearch').placeholder = 'Route, fleet #, or model';
     document.title=`${SYSTEMS[state.system].name} · Bus Radar`;
     try {

@@ -1,0 +1,9 @@
+/* V3.4.2: clearer route navigation without competing map overlays. */
+.v342-return-routes{display:none;min-width:94px;width:auto;height:39px;padding:0 12px;white-space:nowrap;font-weight:700;font-size:12px;background:var(--panel,#fff);color:var(--text,#222);border:1px solid var(--line,#bbb)}
+@media(min-width:721px){body.detail-open .v342-return-routes{display:inline-flex;align-items:center;justify-content:center}}
+.detail-section .back-button{display:flex;align-items:center;position:sticky;top:-19px;z-index:5;min-height:44px;min-width:100%;padding:10px 13px;margin:-6px 0 16px;border:1px solid var(--line,#a5a5a5);background:var(--panel,#fff);color:var(--text,#222);border-radius:6px;text-align:left;font-size:14px;font-weight:750;box-shadow:0 1px 5px #0002;cursor:pointer}
+.detail-section .back-button:hover,.detail-section .back-button:focus-visible,.v342-return-routes:hover{background:var(--bg,#eee);text-decoration:none;outline-offset:2px}
+body.detail-open.sidebar-hidden .mobile-open{min-width:124px}
+/* Preserve enough top-bar space for narrow landscape viewports. */
+@media(min-width:721px) and (max-width:980px){.v342-return-routes{min-width:78px;padding:0 7px;font-size:11px}}
+@media(max-width:720px){.detail-section .back-button{top:-19px;min-height:48px;font-size:15px}.v342-return-routes{display:none!important}}

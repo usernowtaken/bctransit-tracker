@@ -7,11 +7,12 @@ from PIL import Image
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1] / 'web' / 'buses'
-NEW_ASSETS = {'nova_smart','nova_lfse'}
+NEW_ASSETS = {'nova_smart','nova_lfse','vicinity35','handydart_old','handydart_new'}
 EXPECTED = {
   'xe40','enviro500mmc_classic','xn40_cng','enviro500mmc_green',
   'xn40_classic','xn40_greenrear','nova2','vicinity30','nova3','enviro500'
 }
+UPLOADED_EXPECTED = {'vicinity35','handydart_old','handydart_new','nova_lfse'}
 
 class UploadedBusArtworkTests(unittest.TestCase):
     def test_original_sheet_exact_bytes(self):
@@ -22,6 +23,7 @@ class UploadedBusArtworkTests(unittest.TestCase):
         self.assertFalse(list(ROOT.glob('*.svg')))
         data=json.loads((ROOT/'asset-map.json').read_text())
         self.assertEqual(set(data['assets']),EXPECTED)
+        self.assertEqual(set(data.get('uploaded_assets', {})), UPLOADED_EXPECTED)
         self.assertEqual({p.stem for p in ROOT.glob('*.png') if p.stem not in {'full-original','vicinity30-user-original'}},EXPECTED | NEW_ASSETS)
 
     def test_all_visible_pixels_identical_to_original(self):
@@ -38,5 +40,14 @@ class UploadedBusArtworkTests(unittest.TestCase):
                 self.assertTrue(np.array_equal(crop[:,:,:3][visible],original[:,:,:3][visible]))
                 self.assertTrue(np.count_nonzero(crop[:,:,3]==0)>0)
                 self.assertEqual(int(crop[:,:,3].max()),255)
+
+
+    def test_uploaded_assets_have_transparent_backgrounds(self):
+        for name in ['nova_smart','nova_lfse','vicinity30-user-original','vicinity35','handydart_old','handydart_new']:
+            with self.subTest(asset=name):
+                img = Image.open(ROOT/f'{name}.png').convert('RGBA')
+                alpha = np.array(img)[:,:,3]
+                self.assertEqual(int(alpha.max()), 255)
+                self.assertGreater(int((alpha == 0).sum()), 0)
 
 if __name__ == '__main__': unittest.main()
