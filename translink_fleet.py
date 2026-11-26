@@ -12,7 +12,7 @@ SERIES = (
 (19401,19432,'tl_enviro','Alexander Dennis Enviro500 MMC'),(21401,21425,'tl_enviro','Alexander Dennis Enviro500 MMC'),
 *((a,b,'tl_arboc','ARBOC community shuttle') for a,b in ((19503,19535),(19538,19549),(21501,21562),(24506,24539),(25501,25523))),
 *((a,b,'tl_girardin','Girardin G5 community shuttle') for a,b in ((19550,19554),(23601,23606),(23651,23665),(24601,24634),(25601,25627),(26601,26624))),
-(27001,27001,'tl_solaris12','Solaris Trollino 12 (provisional)'),
+(27001,27001,'tl_solaris12','Solaris Trollino 12 (provisional)'),(28201,28201,'tl_solaris18','Solaris Trollino 18 (provisional)'),
 )
 PATTERN=re.compile(r'^(?:BUS\s*#?\s*|FLEET\s*#?\s*|[BHPRSV]\s*)?(\d{3,5})$',re.I)
 def identify(label, descriptor_id=None):

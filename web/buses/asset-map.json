@@ -1,7 +1,7 @@
 {
   "source": "full-original.png",
   "sha256": "ce6d6c818bb274127ab6707c10dd3376b32eb6d78d56af9181eb9bb4adfc05fb",
-  "method": "Sheet-derived drawings preserve source RGB pixels, with only connected exterior background made transparent. Additional user-supplied regional drawings (Vicinity 35, old HandyDART, new HandyDART, updated LFSe) also have only their border-connected white background removed.",
+  "method": "Sheet-derived drawings preserve source RGB pixels, with only connected exterior background made transparent. Additional user-supplied regional drawings (Vicinity 35, old HandyDART, new HandyDART, updated LFSe) also have only their border-connected white background removed. Vancouver user-supplied drawings were also cleaned by removing only the border-connected light-grey background, then scaled onto transparent canvases with no redrawing.",
   "assets": {
     "xe40": {
       "file": "xe40.png",
@@ -111,6 +111,106 @@
     "nova_lfse": {
       "file": "nova_lfse.png",
       "source": "1b05fe5b-d1ad-5d7f-bd15-03ed1dfe2600.png"
+    },
+    "tl_e60": {
+      "file": "tl_e60.png",
+      "source": "45ebf647-2051-5c13-bf56-2540d7c7266b.png",
+      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+    },
+    "tl_de60": {
+      "file": "tl_de60.png",
+      "source": "2d1f8743-8902-5c5c-b970-35c108209a84.png",
+      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+    },
+    "tl_xde60": {
+      "file": "tl_xde60.png",
+      "source": "82baaf34-2383-5cb8-b871-92f21368ec5a.png",
+      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+    },
+    "tl_artic_alt": {
+      "file": "tl_artic_alt.png",
+      "source": "ecd7d1e8-2687-5b0a-9377-c16709e4eb68.png",
+      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+    },
+    "tl_arboc": {
+      "file": "tl_arboc.png",
+      "source": "ddd47719-97e1-5589-bba2-a0ae63e4b2e9.png",
+      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+    },
+    "tl_girardin": {
+      "file": "tl_girardin.png",
+      "source": "626d53e4-b50f-51f9-87c0-10b8cfe4588f.png",
+      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+    },
+    "tl_enviro": {
+      "file": "tl_enviro.png",
+      "source": "c575d4e9-d496-5d08-b059-4ea5f14be5bc.png",
+      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+    },
+    "tl_lfse": {
+      "file": "tl_lfse.png",
+      "source": "8db686df-8875-5b6a-9d61-dcbc0ee68dc6.png",
+      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+    },
+    "tl_lfshev": {
+      "file": "tl_lfshev.png",
+      "source": "6254d9ee-2391-5ed5-b838-c7cb41104ae6.png",
+      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+    },
+    "tl_lfssub": {
+      "file": "tl_lfssub.png",
+      "source": "69cd9adb-411e-54fd-babc-0d79e73859cb.png",
+      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+    },
+    "tl_lfs": {
+      "file": "tl_lfs.png",
+      "source": "4827bdb5-b732-5ffe-a363-71799d7d643a.png",
+      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+    },
+    "tl_xn40": {
+      "file": "tl_xn40.png",
+      "source": "f271867b-e7a8-50de-aa11-92cde3029eb4.png",
+      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+    },
+    "tl_xd40": {
+      "file": "tl_xd40.png",
+      "source": "aa7a605d-18dc-586b-98a7-08bbdbf70a00.png",
+      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+    },
+    "tl_xn40_alt": {
+      "file": "tl_xn40_alt.png",
+      "source": "4ad53015-127d-59b6-bf20-6c13ebab73d3.png",
+      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+    },
+    "tl_e40": {
+      "file": "tl_e40.png",
+      "source": "164e333b-523d-5151-91ba-18e5880fbb6b.png",
+      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+    },
+    "tl_e40_alt": {
+      "file": "tl_e40_alt.png",
+      "source": "83d59d0d-bb80-5513-85e8-5574ac2106fe.png",
+      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+    },
+    "tl_solaris12": {
+      "file": "tl_solaris12.png",
+      "source": "a064068b-2c74-5a4c-93bc-e93e360d984a.png",
+      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+    },
+    "tl_solaris18": {
+      "file": "tl_solaris18.png",
+      "source": "fd6d2625-48a0-5b91-8538-5d98e454b1b2.png",
+      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+    },
+    "tl_lfscng": {
+      "file": "tl_lfscng.png",
+      "source": "42ebfc9e-045b-5bdf-b088-2d54dac34da0.png",
+      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+    },
+    "tl_xd40_alt": {
+      "file": "tl_xd40_alt.png",
+      "source": "5ce5440a-c168-5db2-8426-dce414f9adf7.png",
+      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
     }
   }
 }

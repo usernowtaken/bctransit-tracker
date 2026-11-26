@@ -1,4 +1,4 @@
-# Bus Radar V4.0 Alpha — Metro Vancouver
+# Bus Radar V4.0 Alpha 2 — Metro Vancouver Art & NIS Fix
 
 ## Railway setup (one replica)
 
@@ -361,3 +361,9 @@ Chilliwack/FVX and Cowichan identified NovaBus LFS Gen 4 buses now select `nova3
 - Search expands the panel, avoids duplicate clear controls, and adapts to the visual viewport when the keyboard opens. A selected bus remains selected when returning to the map; reopen using Bus details.
 - Mobile settings remain accessible at the top, including a reset-map button. Light/dark styles, fleet illustrations and regional fleet mappings are preserved. Phone landscape is covered through a coarse-pointer breakpoint.
 - Offline browser smoke test: `python tests/mobile_browser_check.py` (optional Playwright dependency). Tests use synthetic vehicle responses and no external map service; real device, GPS permissions, actual GTFS and Railway deployment require live validation.
+
+
+## Alpha 2 additions
+- Added cleaned transparent TransLink user-supplied drawings across the Metro Vancouver fleet gallery and vehicle panel.
+- Added provisional Solaris Trollino 18 support for fleet 28201.
+- Reduced false generic-NIS classifications for route labels containing `Via`, including routes such as 52, 15, 40 and 26.

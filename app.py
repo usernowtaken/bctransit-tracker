@@ -551,8 +551,16 @@ def infer_service_label(headsign: str | None, route_name: str | None) -> dict[st
     general = (route_name or '').strip()
     def endpoint_pair(value: str) -> bool:
         chunks = [chunk.strip() for chunk in value.split('/')]
-        return len(chunks) >= 2 and all(len(chunk) >= 3 for chunk in chunks) and not any(
-            chunk.casefold().startswith(('to ', 'via ')) for chunk in chunks)
+        if len(chunks) < 2 or not all(len(chunk) >= 3 for chunk in chunks):
+            return False
+        # Do not classify service descriptions like "Bear Mountain / Via RRU"
+        # or "26 Dockyard / Via McKenzie" as generic NIS labels.
+        for chunk in chunks:
+            folded = chunk.casefold()
+            words = {part.strip('.,-()') for part in folded.split()}
+            if folded.startswith(('to ', 'via ')) or 'via' in words:
+                return False
+        return True
     if label.casefold().startswith(('to ', 'via ')):
         return {'state': 'regular', 'basis': 'Specific directional destination label'}
     if label and endpoint_pair(label):
