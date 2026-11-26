@@ -1,6 +1,6 @@
-# V4.0 Alpha 2: Metro Vancouver
+# V4.0 Alpha 3: Metro Vancouver
 
-See `translink_fleet.py` for preliminary production-series mapping from the planning research. These ranges are not a validated active roster, and descriptor IDs and depot prefixes still need live verification. Vancouver now uses user-supplied cleaned reference drawings for the main identified fleet families. Some art-to-model assignments remain provisional until verified against the live roster. BC Transit ranges below are unchanged.
+See `translink_fleet.py` for preliminary production-series mapping from the planning research. These ranges are not a validated active roster, and descriptor IDs and depot prefixes still need live verification. Vancouver now uses user-supplied cleaned reference drawings for the main identified fleet families. See VANCOUVER-FLEET-AUDIT.md for the audited fleet and artwork mappings. Individual fleet assignment and livery remain unverified. BC Transit ranges below are unchanged.
 
 # Regional BC Transit fleet lookup — V3.4.13
 

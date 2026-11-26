@@ -38,6 +38,6 @@ assert.strictEqual(art({model_key:'vicinity30cng',fleet_number:'4232'}).id,'vici
 assert.strictEqual(art({model_key:'nova3',nova_generation:4,fleet_number:'6017'}).id,'nova3');
 state.system='chilliwack';
 assert.strictEqual(art({model_key:'nova3',nova_generation:4,fleet_number:'9451'}).id,'nova3');
-for(const part of ['/app.js?v=4.0-alpha','/pwa.js?v=4.0-alpha']) {assert(html.includes(part));assert(sw.includes(part));}
-assert(sw.includes('victoria-bus-radar-shell-v4.0-alpha'));
+for(const part of ['/app.js?v=4.0-alpha3','/pwa.js?v=4.0-alpha3']) {assert(html.includes(part));assert(sw.includes(part));}
+assert(sw.includes('victoria-bus-radar-shell-v4.0-alpha3'));
 console.log('Regional UI, sharing, Nova roof parity, and PWA cache PASS');

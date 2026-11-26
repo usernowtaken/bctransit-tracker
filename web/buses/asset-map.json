@@ -1,7 +1,7 @@
 {
   "source": "full-original.png",
   "sha256": "ce6d6c818bb274127ab6707c10dd3376b32eb6d78d56af9181eb9bb4adfc05fb",
-  "method": "Sheet-derived drawings preserve source RGB pixels, with only connected exterior background made transparent. Additional user-supplied regional drawings (Vicinity 35, old HandyDART, new HandyDART, updated LFSe) also have only their border-connected white background removed. Vancouver user-supplied drawings were also cleaned by removing only the border-connected light-grey background, then scaled onto transparent canvases with no redrawing.",
+  "method": "Existing BC Transit art unchanged. Vancouver art matched by original upload filename, exterior white background removed, proportionally trimmed/downscaled; no redraw.",
   "assets": {
     "xe40": {
       "file": "xe40.png",
@@ -114,103 +114,123 @@
     },
     "tl_e60": {
       "file": "tl_e60.png",
-      "source": "45ebf647-2051-5c13-bf56-2540d7c7266b.png",
-      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+      "source": "e60lfr.png",
+      "source_sha256": "18f60562526b4f8f8b5dd9e9974e1ca65f5dcdbdc9bd362aa65eeb611638c913",
+      "processed": "Exterior near-white background made transparent; trimmed and proportionally downscaled if needed."
     },
     "tl_de60": {
       "file": "tl_de60.png",
-      "source": "2d1f8743-8902-5c5c-b970-35c108209a84.png",
-      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
-    },
-    "tl_xde60": {
-      "file": "tl_xde60.png",
-      "source": "82baaf34-2383-5cb8-b871-92f21368ec5a.png",
-      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
-    },
-    "tl_artic_alt": {
-      "file": "tl_artic_alt.png",
-      "source": "ecd7d1e8-2687-5b0a-9377-c16709e4eb68.png",
-      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+      "source": "de60lfr.png",
+      "source_sha256": "e82a21f64e9c84d9aed448e46aaab4db8332570c53d71d1e92e6414aea85fa5c",
+      "processed": "Exterior near-white background made transparent; trimmed and proportionally downscaled if needed."
     },
     "tl_arboc": {
       "file": "tl_arboc.png",
-      "source": "ddd47719-97e1-5589-bba2-a0ae63e4b2e9.png",
-      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+      "source": "arboc.png",
+      "source_sha256": "84e8b98187b2c1181d247b6ac020dba3ea9ad98f9c5c78e0d45aaa79dbe0889c",
+      "processed": "Exterior near-white background made transparent; trimmed and proportionally downscaled if needed."
     },
     "tl_girardin": {
       "file": "tl_girardin.png",
-      "source": "626d53e4-b50f-51f9-87c0-10b8cfe4588f.png",
-      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+      "source": "girardin.png",
+      "source_sha256": "84e8b98187b2c1181d247b6ac020dba3ea9ad98f9c5c78e0d45aaa79dbe0889c",
+      "processed": "Exterior near-white background made transparent; trimmed and proportionally downscaled if needed."
     },
     "tl_enviro": {
       "file": "tl_enviro.png",
-      "source": "c575d4e9-d496-5d08-b059-4ea5f14be5bc.png",
-      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
-    },
-    "tl_lfse": {
-      "file": "tl_lfse.png",
-      "source": "8db686df-8875-5b6a-9d61-dcbc0ee68dc6.png",
-      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
-    },
-    "tl_lfshev": {
-      "file": "tl_lfshev.png",
-      "source": "6254d9ee-2391-5ed5-b838-c7cb41104ae6.png",
-      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
-    },
-    "tl_lfssub": {
-      "file": "tl_lfssub.png",
-      "source": "69cd9adb-411e-54fd-babc-0d79e73859cb.png",
-      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
-    },
-    "tl_lfs": {
-      "file": "tl_lfs.png",
-      "source": "4827bdb5-b732-5ffe-a363-71799d7d643a.png",
-      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
-    },
-    "tl_xn40": {
-      "file": "tl_xn40.png",
-      "source": "f271867b-e7a8-50de-aa11-92cde3029eb4.png",
-      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
-    },
-    "tl_xd40": {
-      "file": "tl_xd40.png",
-      "source": "aa7a605d-18dc-586b-98a7-08bbdbf70a00.png",
-      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
-    },
-    "tl_xn40_alt": {
-      "file": "tl_xn40_alt.png",
-      "source": "4ad53015-127d-59b6-bf20-6c13ebab73d3.png",
-      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+      "source": "env500.png",
+      "source_sha256": "610cdfafb4b429307d08ed0d40be667a246f897e55b2a27cdef9c43bc333aa7f",
+      "processed": "Exterior near-white background made transparent; trimmed and proportionally downscaled if needed."
     },
     "tl_e40": {
       "file": "tl_e40.png",
-      "source": "164e333b-523d-5151-91ba-18e5880fbb6b.png",
-      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+      "source": "e40lfr.png",
+      "source_sha256": "828bab628b1ffa62107e625eaa967f3adadc410c5ba100038752c4c9ca011e14",
+      "processed": "Exterior near-white background made transparent; trimmed and proportionally downscaled if needed."
     },
-    "tl_e40_alt": {
-      "file": "tl_e40_alt.png",
-      "source": "83d59d0d-bb80-5513-85e8-5574ac2106fe.png",
-      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+    "tl_xn40": {
+      "file": "tl_xn40.png",
+      "source": "xn40.png",
+      "source_sha256": "507a8a2ca96c1abd220ff2703702d39fdda3f31b6f0b209584561c93f5215e68",
+      "processed": "Exterior near-white background made transparent; trimmed and proportionally downscaled if needed."
     },
-    "tl_solaris12": {
-      "file": "tl_solaris12.png",
-      "source": "a064068b-2c74-5a4c-93bc-e93e360d984a.png",
-      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+    "tl_xd40": {
+      "file": "tl_xd40.png",
+      "source": "xd40.png",
+      "source_sha256": "9aa0e320454769b79b22cd58d2b86a26d46d918bfcb2eade2ea1ae48556b70f4",
+      "processed": "Exterior near-white background made transparent; trimmed and proportionally downscaled if needed."
     },
-    "tl_solaris18": {
-      "file": "tl_solaris18.png",
-      "source": "fd6d2625-48a0-5b91-8538-5d98e454b1b2.png",
-      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+    "tl_xd40_westvan": {
+      "file": "tl_xd40_westvan.png",
+      "source": "xd40westvan.png",
+      "source_sha256": "9aa0e320454769b79b22cd58d2b86a26d46d918bfcb2eade2ea1ae48556b70f4",
+      "processed": "Exterior near-white background made transparent; trimmed and proportionally downscaled if needed."
     },
     "tl_lfscng": {
       "file": "tl_lfscng.png",
-      "source": "42ebfc9e-045b-5bdf-b088-2d54dac34da0.png",
-      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+      "source": "lfscng.png",
+      "source_sha256": "4a6c2bc02823b3b1a98cc4a61eb71414e8c4e80f58331f69028c65bf089fca52",
+      "processed": "Exterior near-white background made transparent; trimmed and proportionally downscaled if needed."
     },
-    "tl_xd40_alt": {
-      "file": "tl_xd40_alt.png",
-      "source": "5ce5440a-c168-5db2-8426-dce414f9adf7.png",
-      "processed": "Border-connected light-grey background removed; cropped and scaled onto transparent canvas"
+    "tl_lfshev": {
+      "file": "tl_lfshev.png",
+      "source": "lfshev.png",
+      "source_sha256": "0cedef17cda6a45cf060983c0e52fe7122f08bc6caf195203de8350358abc80c",
+      "processed": "Exterior near-white background made transparent; trimmed and proportionally downscaled if needed."
+    },
+    "tl_lfssub": {
+      "file": "tl_lfssub.png",
+      "source": "lfssub.png",
+      "source_sha256": "ad9bd0364516df410e6862c1d7d158908386aec1c842494db45dd2fbc5f70df6",
+      "processed": "Exterior near-white background made transparent; trimmed and proportionally downscaled if needed."
+    },
+    "tl_lfs_westvan": {
+      "file": "tl_lfs_westvan.png",
+      "source": "lfswestvan.png",
+      "source_sha256": "925ba15910aa2dbc8568b0a487b69522c893d909a47415be84e5fb307129e7f3",
+      "processed": "Exterior near-white background made transparent; trimmed and proportionally downscaled if needed."
+    },
+    "tl_lfs_gen2": {
+      "file": "tl_lfs_gen2.png",
+      "source": "lfsgen2.png",
+      "source_sha256": "983308b92247acf49dca3e77e29ea729785f5ff53be609da8b138a52bc8e122a",
+      "processed": "Exterior near-white background made transparent; trimmed and proportionally downscaled if needed."
+    },
+    "tl_lfs_gen3": {
+      "file": "tl_lfs_gen3.png",
+      "source": "lfsgen3.png",
+      "source_sha256": "da646ac9ff73ebd5103e0408dd1ec32b1e867bfa968d39c33ebc3edffa1304b6",
+      "processed": "Exterior near-white background made transparent; trimmed and proportionally downscaled if needed."
+    },
+    "tl_solaris12": {
+      "file": "tl_solaris12.png",
+      "source": "solaris12.png",
+      "source_sha256": "86f900fdbb58e566ad4ce197372542bfafbc4866310fb9c5d3d4c152bde3d495",
+      "processed": "Exterior near-white background made transparent; trimmed and proportionally downscaled if needed."
+    },
+    "tl_solaris18": {
+      "file": "tl_solaris18.png",
+      "source": "solaris18.png",
+      "source_sha256": "315469f8191b4efbcba3de2ab52a477175824f9ecf5363f65e87df927131162c",
+      "processed": "Exterior near-white background made transparent; trimmed and proportionally downscaled if needed."
+    },
+    "tl_xde60": {
+      "file": "tl_xde60.png",
+      "source": "xde60.png",
+      "source_sha256": "96eec461173f3026743fb19d7de09a5c45d048e463c5bd2865b5f15ae0a1b556",
+      "processed": "Exterior near-white background made transparent; trimmed and proportionally downscaled if needed."
+    },
+    "tl_xde60_rapidbus": {
+      "file": "tl_xde60_rapidbus.png",
+      "source": "xde60rapidbus.png",
+      "source_sha256": "858bfa47085fe32c06f15750911e512a03458ee611ac95d77f278c36734f7774",
+      "processed": "Exterior near-white background made transparent; trimmed and proportionally downscaled if needed."
+    },
+    "tl_lfse": {
+      "file": "tl_lfse.png",
+      "source": "lfse+.png",
+      "source_sha256": "15a06a32572f45f0bd6db0870e8184600d0012b299e4bbd5de4d459015eada5f",
+      "processed": "Exterior near-white background made transparent; trimmed and proportionally downscaled if needed."
     }
   }
 }

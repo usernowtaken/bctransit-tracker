@@ -23,8 +23,10 @@ class UploadedBusArtworkTests(unittest.TestCase):
         self.assertFalse(list(ROOT.glob('*.svg')))
         data=json.loads((ROOT/'asset-map.json').read_text())
         self.assertEqual(set(data['assets']),EXPECTED)
-        self.assertEqual(set(data.get('uploaded_assets', {})), UPLOADED_EXPECTED)
-        self.assertEqual({p.stem for p in ROOT.glob('*.png') if p.stem not in {'full-original','vicinity30-user-original'}},EXPECTED | NEW_ASSETS)
+        tl_assets={k for k in data.get('uploaded_assets', {}) if k.startswith('tl_')}
+        self.assertEqual(len(tl_assets),20)
+        self.assertEqual(set(data.get('uploaded_assets', {})), UPLOADED_EXPECTED | tl_assets)
+        self.assertEqual({p.stem for p in ROOT.glob('*.png') if p.stem not in {'full-original','vicinity30-user-original'}},EXPECTED | NEW_ASSETS | tl_assets)
 
     def test_all_visible_pixels_identical_to_original(self):
         data=json.loads((ROOT/'asset-map.json').read_text())

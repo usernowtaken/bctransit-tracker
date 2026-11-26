@@ -2,6 +2,7 @@
 import unittest
 from pathlib import Path
 from html.parser import HTMLParser
+import json
 ROOT=Path(__file__).resolve().parents[1]
 NAMES=("vicinity30","vicinity35","handydart_old","handydart_new","nova2","nova3","nova_smart","nova_lfse","xn40_classic","xn40_greenrear","xn40_cng","xe40","enviro500","enviro500mmc_classic","enviro500mmc_green")
 class Collector(HTMLParser):
@@ -16,8 +17,11 @@ class Gallery(unittest.TestCase):
     def test_one_card_per_supplied_image(self):
         source=(ROOT/'web/fleet-gallery.html').read_text()
         c=Collector();c.feed(source)
-        self.assertEqual(c.cards,15)
-        self.assertEqual(c.images,[f'/buses/{name}.png?v=4.0-alpha' for name in NAMES])
+        self.assertEqual(c.cards,35)
+        self.assertEqual(c.images[:15],[f'/buses/{name}.png?v=4.0-alpha3' for name in NAMES])
+        manifest=json.loads((ROOT/'web/buses/asset-map.json').read_text())['uploaded_assets']
+        self.assertEqual(set(c.images[15:]),{f'/buses/{k}.png?v=4.0-alpha3' for k in manifest if k.startswith('tl_')})
+        self.assertEqual(len(set(c.images)),35)
         self.assertEqual(c.details,1)
     def test_simple_dark_theme_and_placeholder(self):
         src=(ROOT/'web/fleet-gallery.html').read_text()

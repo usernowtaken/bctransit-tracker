@@ -11,7 +11,7 @@
     cowichan: {name:'Cowichan Valley', center:{lat:48.790, lon:-123.708, zoom:10}, shortcuts:['2','4','7','66','99']},
   };
   const DEFAULT_SYSTEM = 'victoria';
-  const MODEL_ASSETS = new Set(['vicinity30','vicinity30cng','vicinity35','vicinity_2013','nova_gen2','nova_gen3','nova_gen4','nova_lfse','light_duty','xn40','xe40','enviro500','enviro500mmc','generic','tl_lfs','tl_xd40','tl_e40','tl_e60','tl_de60','tl_lfshev','tl_xn40','tl_lfssub','tl_lfse','tl_lfscng','tl_xde60','tl_enviro','tl_arboc','tl_girardin','tl_solaris12','tl_solaris18']);
+  const MODEL_ASSETS = new Set(['vicinity30','vicinity30cng','vicinity35','vicinity_2013','nova_gen2','nova_gen3','nova_gen4','nova_lfse','light_duty','xn40','xe40','enviro500','enviro500mmc','generic','tl_lfs','tl_xd40','tl_e40','tl_e60','tl_de60','tl_lfshev','tl_xn40','tl_lfssub','tl_lfse','tl_lfscng','tl_xde60','tl_enviro','tl_arboc','tl_girardin','tl_solaris12','tl_solaris18','tl_c40lfr','tl_d40lfr','tl_d60lfr','tl_orion','tl_lfse_legacy','tl_xe40']);
   // NovaBus *generations* are independent of which reference illustration is displayed.
   const NOVA_GENERATION_FILTERS = Object.freeze({nova_gen2:2,nova_gen3:3,nova_gen4:4});
   // Every illustration below is an EXACT pixel crop from the uploaded full.png.
@@ -40,22 +40,22 @@
       {id:'enviro500mmc_classic', name:'Classic white'},
       {id:'enviro500mmc_green', name:'Green and white'}
     ],
-    tl_lfs: [{id:'tl_lfs', name:'TransLink NovaBus LFS illustration'}],
-    tl_lfshev: [{id:'tl_lfshev', name:'TransLink NovaBus LFS HEV illustration'}],
-    tl_lfssub: [{id:'tl_lfssub', name:'TransLink NovaBus LFS Suburban illustration'}],
-    tl_lfse: [{id:'tl_lfse', name:'TransLink NovaBus LFSe+ illustration'}],
-    tl_lfscng: [{id:'tl_lfscng', name:'TransLink NovaBus LFS CNG illustration'}],
-    tl_xn40: [{id:'tl_xn40', name:'TransLink New Flyer XN40 illustration'}],
-    tl_xd40: [{id:'tl_xd40', name:'TransLink New Flyer XD40 illustration'}],
-    tl_e40: [{id:'tl_e40', name:'TransLink New Flyer E40LFR trolleybus illustration'}],
-    tl_e60: [{id:'tl_e60', name:'TransLink New Flyer E60LFR trolleybus illustration'}],
-    tl_de60: [{id:'tl_de60', name:'TransLink New Flyer DE60LFR illustration'}],
-    tl_xde60: [{id:'tl_xde60', name:'TransLink New Flyer XDE60 illustration'}],
-    tl_enviro: [{id:'tl_enviro', name:'TransLink Enviro500 MMC illustration'}],
-    tl_arboc: [{id:'tl_arboc', name:'TransLink ARBOC community shuttle illustration'}],
-    tl_girardin: [{id:'tl_girardin', name:'TransLink Girardin G5 community shuttle illustration'}],
-    tl_solaris12: [{id:'tl_solaris12', name:'TransLink Solaris Trollino 12 illustration'}],
-    tl_solaris18: [{id:'tl_solaris18', name:'TransLink Solaris Trollino 18 illustration'}]
+    tl_lfs: [{"id": "tl_lfs_gen2", "name": "TransLink fleet-cohort reference"}, {"id": "tl_lfs_gen3", "name": "TransLink fleet-cohort reference"}, {"id": "tl_lfs_westvan", "name": "TransLink fleet-cohort reference"}],
+    tl_xd40: [{"id": "tl_xd40", "name": "TransLink fleet-cohort reference"}, {"id": "tl_xd40_westvan", "name": "TransLink fleet-cohort reference"}],
+    tl_e40: [{"id": "tl_e40", "name": "TransLink fleet-cohort reference"}],
+    tl_e60: [{"id": "tl_e60", "name": "TransLink fleet-cohort reference"}],
+    tl_de60: [{"id": "tl_de60", "name": "TransLink fleet-cohort reference"}],
+    tl_lfshev: [{"id": "tl_lfshev", "name": "TransLink fleet-cohort reference"}],
+    tl_xn40: [{"id": "tl_xn40", "name": "TransLink fleet-cohort reference"}],
+    tl_lfssub: [{"id": "tl_lfssub", "name": "TransLink fleet-cohort reference"}],
+    tl_lfse: [{"id": "tl_lfse", "name": "TransLink fleet-cohort reference"}],
+    tl_lfscng: [{"id": "tl_lfscng", "name": "TransLink fleet-cohort reference"}],
+    tl_xde60: [{"id": "tl_xde60", "name": "TransLink fleet-cohort reference"}, {"id": "tl_xde60_rapidbus", "name": "TransLink fleet-cohort reference"}],
+    tl_enviro: [{"id": "tl_enviro", "name": "TransLink fleet-cohort reference"}],
+    tl_arboc: [{"id": "tl_arboc", "name": "TransLink fleet-cohort reference"}],
+    tl_girardin: [{"id": "tl_girardin", "name": "TransLink fleet-cohort reference"}],
+    tl_solaris12: [{"id": "tl_solaris12", "name": "TransLink fleet-cohort reference"}],
+    tl_solaris18: [{"id": "tl_solaris18", "name": "TransLink fleet-cohort reference"}]
   });
   const artChoices = (() => {
     try { return JSON.parse(localStorage.getItem('bct_bus_art_variants_v30') || '{}') || {}; }
@@ -77,6 +77,7 @@
     '9434': 'smart', // Documented 2012 Smart Bus prototype, full-length fairings.
   });
   const isNova2009 = (vehicle) => {
+    if (state.system === 'vancouver') return false;
     const fleet = String(vehicle?.fleet_number ?? '');
     if (!/^\d{4}$/.test(fleet)) return false;
     return Number(fleet) >= 9319 && Number(fleet) <= 9433 &&
@@ -114,8 +115,9 @@
   const isUnverifiedNova = () => false;
   const busArtVariant = (vehicle) => {
     if (state.system === 'vancouver') {
-      const available = BUS_ART[vehicle?.model_key] || [];
-      return available[0] || null;
+      const id = vehicle?.fleet_art_id;
+      return typeof id === 'string' && (BUS_ART[vehicle?.model_key] || []).some(item => item.id === id && id.startsWith('tl_'))
+        ? {id, name:'TransLink fleet-cohort reference illustration'} : null;
     }
     // Only genuinely unsupplied regional models should remain
     // PLACEHOLDER / N/A rather than borrowing the wrong drawing.
@@ -618,7 +620,7 @@
     if (chosenArt) {
       const manualArt = variants.find(v => v.id === artChoices[artKey(vehicle)]);
       artSelect.value = vehicle.model_key === 'xn40' && !manualArt ? 'auto' : chosenArt.id;
-      const source = '/buses/' + chosenArt.id + '.png?v=4.0-alpha2';
+      const source = '/buses/' + chosenArt.id + '.png?v=4.0-alpha3';
       if (busImage.getAttribute('src') !== source) busImage.src = source;
       busImage.hidden = false;
       busImage.alt = `${vehicle.model || 'Bus'} — vehicle illustration (${chosenArt.name})`;

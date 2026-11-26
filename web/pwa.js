@@ -26,7 +26,7 @@
     if (!help.open) help.showModal();
   }
   if ('serviceWorker' in navigator && window.isSecureContext) {
-    navigator.serviceWorker.register('/sw.js?v=4.0-alpha2').then(registration => {
+    navigator.serviceWorker.register('/sw.js?v=4.0-alpha3').then(registration => {
       // Ask for a newer worker on resume, not every GPS refresh.
       let lastCheck = Date.now();
       const check = () => {

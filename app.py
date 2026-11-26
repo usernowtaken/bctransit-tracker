@@ -170,7 +170,7 @@ STATIC_PARSE_LOCK = threading.Lock()
 MAX_FEED_BYTES = 12 * 1024 * 1024
 MAX_ZIP_BYTES = 85 * 1024 * 1024
 REQUEST_TIMEOUT = 16
-USER_AGENT = "BusRadar/4.0-alpha (unofficial public transit map)"
+USER_AGENT = "BusRadar/4.0-alpha3 (unofficial public transit map)"
 TIMEZONE = ZoneInfo("America/Vancouver")
 
 OFF_ROUTE_THRESHOLD_M = 100  # user-selected heuristic; route detours / GPS noise can trigger off-route warnings

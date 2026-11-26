@@ -25,5 +25,5 @@ const select=(html.match(/<select id="systemSelect"[\s\S]*?<\/select>/)||[])[0];
 assert.match(select,/value="cowichan">Cowichan Valley/);
 assert.match(src,/cowichan: \{name:'Cowichan Valley'/);
 const sw=fs.readFileSync(path.join(root,'web/sw.js'),'utf8');
-assert(sw.includes("victoria-bus-radar-shell-v4.0-alpha"));
+assert(sw.includes("victoria-bus-radar-shell-v4.0-alpha3"));
 console.log('V4.0 Alpha Cowichan and Kelowna Gen 4 regional model images PASS');
