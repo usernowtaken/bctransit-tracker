@@ -1,4 +1,4 @@
-"""V3.4.11 Cowichan and Kelowna-only Gen 4 reference tests (offline)."""
+"""V4.0 Alpha Cowichan and Kelowna-only Gen 4 reference tests (offline)."""
 import pathlib
 import unittest
 from fleet_identity import identify_vehicle, identify_feed_vehicle

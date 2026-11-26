@@ -64,7 +64,7 @@ class GPSHistory:
                proximity: dict[str, dict[str, Any]] | None = None) -> int:
         """Insert fresh, distinct GPS timestamps once; this is not a route snapper."""
         now = int(time.time() if now is None else now)
-        if system not in ('victoria', 'chilliwack', 'kelowna', 'cowichan'):
+        if system not in ('victoria', 'chilliwack', 'kelowna', 'cowichan', 'vancouver'):
             raise ValueError('Unsupported transit system')
         index = index or {}
         proximity = proximity or {}
@@ -94,7 +94,7 @@ class GPSHistory:
                 prox_status = None
             dist = info.get('distance_m')
             dist = int(dist) if isinstance(dist, (float,int)) and math.isfinite(dist) and 0 <= dist < 1000000 else None
-            fleet_number = identify_feed_vehicle(system, vehicle.get('label'), ident).get('fleet_number')
+            fleet_number = identify_feed_vehicle(system, vehicle.get('label'), vehicle.get('descriptor_id') if system == 'vancouver' else ident).get('fleet_number')
             batch.append((system, ident, ts, lat, lon, str(route)[:24] if route else None,
                           str(trip_id)[:256] if trip_id else None,
                           str(vehicle.get('label') or '')[:128] or None, now, prox_status, dist,
@@ -116,7 +116,7 @@ class GPSHistory:
 
     def get(self, system: str, vehicle_id: str, minutes: int = 30,
             now: int | None = None) -> dict[str, Any]:
-        if system not in ('victoria', 'chilliwack', 'kelowna', 'cowichan'):
+        if system not in ('victoria', 'chilliwack', 'kelowna', 'cowichan', 'vancouver'):
             raise ValueError('Unsupported transit system')
         if not vehicle_id or len(vehicle_id) > 128:
             raise ValueError('Invalid vehicle identifier')
@@ -139,7 +139,7 @@ class GPSHistory:
     def activity(self, system: str, vehicle_id: str, minutes: int = 180,
                  now: int | None = None) -> dict[str, Any]:
         """Summarize recorded observations only; no scheduled routes or interpolated trips."""
-        if system not in ('victoria', 'chilliwack', 'kelowna', 'cowichan'):
+        if system not in ('victoria', 'chilliwack', 'kelowna', 'cowichan', 'vancouver'):
             raise ValueError('Unsupported transit system')
         if not vehicle_id or len(vehicle_id) > 128:
             raise ValueError('Invalid vehicle identifier')
@@ -160,12 +160,12 @@ class GPSHistory:
     def last_known(self, system: str, vehicle_id: str = '', fleet: str = '',
                    now: int | None = None) -> dict[str, Any]:
         """Return the last recorded fix (24 h max), clearly not a live position."""
-        if system not in ('victoria', 'chilliwack', 'kelowna', 'cowichan'):
+        if system not in ('victoria', 'chilliwack', 'kelowna', 'cowichan', 'vancouver'):
             raise ValueError('Unsupported transit system')
         if not vehicle_id and not fleet:
             raise ValueError('Vehicle ID or fleet number required')
-        if fleet and (len(fleet) != 4 or not fleet.isdigit()):
-            raise ValueError('Fleet lookup requires a four-digit fleet number')
+        if fleet and (len(fleet) not in ((3,4,5) if system == "vancouver" else (4,)) or not fleet.isdigit()):
+            raise ValueError('Invalid fleet number for transit system')
         if vehicle_id and len(vehicle_id) > 128:
             raise ValueError('Vehicle ID too long')
         now = int(time.time() if now is None else now)

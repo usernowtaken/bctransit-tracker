@@ -1,4 +1,4 @@
-// V3.4.11: Cowichan picker, Kelowna-only Gen 4 image, and new regional artwork.
+// V4.0 Alpha: Cowichan picker, Kelowna-only Gen 4 image, and new regional artwork.
 const fs=require('fs'),path=require('path'),assert=require('assert');
 const root=path.join(__dirname,'..');
 const src=fs.readFileSync(path.join(root,'web/app.js'),'utf8');
@@ -25,5 +25,5 @@ const select=(html.match(/<select id="systemSelect"[\s\S]*?<\/select>/)||[])[0];
 assert.match(select,/value="cowichan">Cowichan Valley/);
 assert.match(src,/cowichan: \{name:'Cowichan Valley'/);
 const sw=fs.readFileSync(path.join(root,'web/sw.js'),'utf8');
-assert(sw.includes("victoria-bus-radar-shell-v3.4.11-gen4art"));
-console.log('V3.4.11 Cowichan and Kelowna Gen 4 regional model images PASS');
+assert(sw.includes("victoria-bus-radar-shell-v4.0-alpha"));
+console.log('V4.0 Alpha Cowichan and Kelowna Gen 4 regional model images PASS');

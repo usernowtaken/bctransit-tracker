@@ -49,12 +49,12 @@ class NovaFleetVariantTests(unittest.TestCase):
         for term in ('novaSmartSpecial','detailNovaBody'):
             self.assertIn(term,html)
             self.assertIn(term,js)
-        self.assertIn('/app.js?v=3.4.7',html)
-        self.assertIn('/app.js?v=3.4.7',sw)
-        self.assertIn('/v342.css?v=3.4.2',html)
-        self.assertIn('/v30.css?v=3.0.5',html)
-        self.assertIn('/v30.css?v=3.0.5',sw)
-        self.assertIn('victoria-bus-radar-shell-v3.4.7',sw)
+        self.assertIn('/app.js?v=4.0-alpha',html)
+        self.assertIn('/app.js?v=4.0-alpha',sw)
+        self.assertIn('/v342.css?v=4.0-alpha',html)
+        self.assertIn('/v30.css?v=4.0-alpha',html)
+        self.assertIn('/v30.css?v=4.0-alpha',sw)
+        self.assertIn('victoria-bus-radar-shell-v4.0-alpha',sw)
 
 if __name__ == '__main__':
     unittest.main()

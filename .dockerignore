@@ -6,3 +6,7 @@ __pycache__/
 tests/
 *.zip
 *-test.png
+
+.env
+.env.*
+*.sqlite3

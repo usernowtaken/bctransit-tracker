@@ -1,5 +1,5 @@
 /* V2.5 mobile refinement. Keep both classic themes exactly the same. */
-@media (max-width: 720px) {
+@media (max-width:720px), (max-width:1100px) and (max-height:550px) and (any-pointer:coarse), (min-width:721px) and (max-width:1100px) and (orientation:portrait) and (any-pointer:coarse){
   .app-shell { min-height: 0; }
   .sidebar { padding-bottom: env(safe-area-inset-bottom, 0px); }
   body.detail-open .sidebar { height: min(78dvh, 740px); }
@@ -26,7 +26,7 @@
 /* V2.6: touch-first controls, one-handed sheet and cheap rendering for older phones.
    Applies identically to Classic Light and Classic Dark. */
 .mobile-sheet-handle,.mobile-open,.lite-toggle{display:none}
-@media(max-width:720px){
+@media (max-width:720px), (max-width:1100px) and (max-height:550px) and (any-pointer:coarse), (min-width:721px) and (max-width:1100px) and (orientation:portrait) and (any-pointer:coarse){
   html,body,.app-shell{height:100%;height:100dvh}
   .sidebar{height:58dvh;min-height:0;border-radius:12px 12px 0 0!important;will-change:transform;transition:transform .18s ease,height .18s ease!important}
   body.detail-open .sidebar{height:66dvh}

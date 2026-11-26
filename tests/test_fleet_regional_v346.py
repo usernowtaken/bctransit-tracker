@@ -1,4 +1,4 @@
-"""V3.4.11 fleet-year, regional, and placeholder regression checks."""
+"""V4.0 Alpha fleet-year, regional, and placeholder regression checks."""
 import pathlib
 import unittest
 from fleet_identity import identify_vehicle, identify_feed_vehicle
@@ -71,6 +71,6 @@ class RegionalFleetModelsV346(unittest.TestCase):
         self.assertIn('/buses/vicinity35.png', gallery)
         self.assertIn('/buses/handydart_old.png', gallery)
         self.assertIn('/buses/handydart_new.png', gallery)
-        self.assertIn('V3.4.11',html)
+        self.assertIn('V4.0 Alpha',html)
 
 if __name__=='__main__': unittest.main()

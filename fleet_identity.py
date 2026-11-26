@@ -1,4 +1,4 @@
-"""Conservative, offline fleet lookup for BC Transit Bus Radar V3.4.11.
+"""Conservative, offline fleet lookup for BC Transit Bus Radar V3.4.13.
 
 IMPORTANT:
 - A four-digit suffix in a Victoria VehicleDescriptor.label is a *candidate*,
@@ -218,6 +218,9 @@ def identify_vehicle(system_id: str, label: Any) -> dict[str, Any]:
     result = {'fleet_number': None, 'fleet_status': 'unavailable',
               'fleet_basis': None, 'model_key': 'generic', 'model': None,
               'model_basis': None}
+    if system_id == "vancouver":
+        from translink_fleet import identify
+        return identify(label)
     if system_id not in ('victoria', 'kelowna', 'chilliwack', 'cowichan') or not isinstance(label, str):
         return result
     clean = label.strip()
@@ -249,6 +252,9 @@ def identify_feed_vehicle(system_id: str, label: Any, descriptor_id: Any) -> dic
     Never interpret arbitrary numeric suffixes or trip IDs as a fleet number.
     The raw ID is a *candidate* only if it matches a documented model series.
     """
+    if system_id == "vancouver":
+        from translink_fleet import identify
+        return identify(label, descriptor_id)
     primary = identify_vehicle(system_id, label)
     if primary.get('fleet_number'):
         return primary

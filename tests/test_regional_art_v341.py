@@ -35,10 +35,11 @@ class RegionalArtTests(unittest.TestCase):
     def test_exact_supplied_image_bytes(self):
         # The project owner's two source-image uploads are not always mounted
         # alongside a deployed code package. Verify exact hashes of the supplied
-        # image bytes from the accepted V3.4.5 baseline instead.
+        # image bytes from the accepted V3.4.12 baseline (includes the
+        # V3.4.8 transparency and V3.4.9 LFSe replacement).
         expected = {
-            'nova_smart.png': '5811dec1f29144fdde63f25b8d1495317c0e88c135ea593206f677e5ca0b7681',
-            'nova_lfse.png': 'bad9e88f473e84e373a409fa2e970bd170875d667bbb71f02dc9bc03d08d4d03',
+            'nova_smart.png': '1694a9de967ed977be2a7ff8a330c1c2a8225d4d4bc1774ca4efe33a9c7d29cf',
+            'nova_lfse.png': 'fdbf23cba255f091dfda271280ce4ba21ca416c031ffe1868147a3b18a4c8a53',
         }
         for out, sha256 in expected.items():
             with self.subTest(out=out):

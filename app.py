@@ -26,6 +26,7 @@ import zipfile
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from fleet_identity import identify_vehicle, identify_feed_vehicle
+from translink import TransLink, STATIC_URL, BASE as TL_BASE, ENDPOINTS as TL_ENDPOINTS
 from service_alerts import parse_alert_feed
 from gps_history import GPSHistory
 from zoneinfo import ZoneInfo
@@ -42,6 +43,7 @@ INDEX_PATH = CACHE_DIR / "gtfs_v2.json.gz"  # Old Victoria cache, for backwards 
 # Operator IDs come from BC Transit's public GTFS links. Operator 13 is a
 # *shared* Fraser Valley feed: its Chilliwack view is filtered by public route.
 SYSTEMS = {
+    "vancouver": {"name":"Metro Vancouver", "operator":None, "center":[49.22,-123.02], "zoom":10, "bounds":(48.95,49.60,-123.65,-121.85)},
     "victoria": {"name": "Greater Victoria", "operator": 48, "center": [48.48, -123.49], "zoom": 10,
                  "bounds": (48.15, 49.05, -124.50, -122.70)},
     "chilliwack": {"name": "Chilliwack / Fraser Valley Express", "operator": 13,
@@ -79,6 +81,10 @@ def trip_in_view(system_id: str, index: dict[str, Any], trip_id: str) -> bool:
 
 
 def vehicle_in_view(system_id: str, index: dict[str, Any], vehicle: dict[str, Any]) -> bool:
+    if system_id == 'vancouver':
+        trip = index.get('trips', {}).get(vehicle.get('trip_id') or '', {})
+        rid = vehicle.get('route_id') or trip.get('route_id') or ''
+        return rid not in index.get('excluded_routes', {}) and (vehicle.get('trip_id') or '') not in index.get('excluded_trips', {})
     if system_id != 'chilliwack':
         return True
     trip = index.get('trips', {}).get(vehicle.get('trip_id') or '', {})
@@ -144,6 +150,8 @@ def region_alerts(system_id: str, alerts: list[dict[str, Any]], index: dict[str,
 
 
 def system_feed_url(system_id: str, kind: str) -> str:
+    if system_id == "vancouver":
+        return STATIC_URL if kind == "static" else TL_BASE + TL_ENDPOINTS[kind]
     op = SYSTEMS[system_id]["operator"]
     base = "https://bct.tmix.se/"
     if kind == "static":
@@ -162,7 +170,7 @@ STATIC_PARSE_LOCK = threading.Lock()
 MAX_FEED_BYTES = 12 * 1024 * 1024
 MAX_ZIP_BYTES = 85 * 1024 * 1024
 REQUEST_TIMEOUT = 16
-USER_AGENT = "BCTransitBusRadar/3.4.11 (unofficial public transit map)"
+USER_AGENT = "BusRadar/4.0-alpha (unofficial public transit map)"
 TIMEZONE = ZoneInfo("America/Vancouver")
 
 OFF_ROUTE_THRESHOLD_M = 100  # user-selected heuristic; route detours / GPS noise can trigger off-route warnings
@@ -215,6 +223,7 @@ def parse_vehicle_feed(body: bytes, system_id: str = "victoria") -> tuple[list[d
             "start_date": trip.start_date if trip and trip.start_date else None,
             "start_time": trip.start_time if trip and trip.start_time else None,
             "label": descriptor.label if descriptor and descriptor.label else None,
+            "descriptor_id": descriptor.id if descriptor and descriptor.id else None,
             "stop_sequence": int(vehicle.current_stop_sequence) if vehicle.HasField("current_stop_sequence") else None,
             "stop_id": vehicle.stop_id if vehicle.HasField("stop_id") else None,
             "stop_status": int(vehicle.current_status) if vehicle.HasField("current_status") else 2,
@@ -263,14 +272,14 @@ def parse_trip_update_feed(body: bytes) -> tuple[dict[str, Any], int | None]:
     return updates, stamp
 
 
-def _csv_rows(archive: zipfile.ZipFile, filename: str, required: bool = True):
+def _csv_rows(archive: zipfile.ZipFile, filename: str, required: bool = True, max_size: int = 180 * 1024 * 1024):
     match = next((part for part in archive.namelist() if part.rsplit("/", 1)[-1].lower() == filename), None)
     if not match:
         if required:
             raise ValueError(f"GTFS missing {filename}")
         return
     entry = archive.getinfo(match)
-    if entry.file_size > 180 * 1024 * 1024:
+    if entry.file_size > max_size:
         raise ValueError(f"GTFS {filename} exceeds safety limit")
     with archive.open(match) as binary:
         reader = csv.DictReader(io.TextIOWrapper(binary, encoding="utf-8-sig", newline=""))
@@ -322,21 +331,45 @@ def _simplify(points: list[list[float]], tolerance_m: float = 9.0) -> list[list[
     return [points[i] for i in sorted(keep)]
 
 
-def parse_static_gtfs(blob: bytes) -> dict[str, Any]:
+def parse_static_gtfs(blob: bytes, bus_only: bool = False) -> dict[str, Any]:
     routes, trips, stops, shapes, service_days, exceptions = {}, {}, {}, {}, {}, defaultdict(dict)
+    excluded_routes, excluded_trips = {}, {}
     trip_stops = defaultdict(list)
     blocks = defaultdict(list)
     with zipfile.ZipFile(io.BytesIO(blob)) as archive:
         for row in _csv_rows(archive, "routes.txt"):
             rid = (row.get("route_id") or "").strip()
             if rid:
+                if bus_only and row.get('route_type') not in ('3','11','800') and not (str(row.get('route_type') or '').isdigit() and 700 <= int(row['route_type']) <= 799):
+                    excluded_routes[rid]=True
+                    continue
                 routes[rid] = {"short": (row.get("route_short_name") or "").strip(),
                                "long": (row.get("route_long_name") or "").strip(),
                                "color": _safe_hex(row.get("route_color")),
                                "text_color": _safe_hex(row.get("route_text_color"))}
+        for row in _csv_rows(archive, "calendar.txt", required=False):
+            service_id = row.get("service_id") or ""
+            if service_id:
+                service_days[service_id] = {"start": row.get("start_date") or "", "end": row.get("end_date") or "",
+                    "weekdays": [row.get(day) == "1" for day in ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")]}
+        for row in _csv_rows(archive, "calendar_dates.txt", required=False):
+            service_id = row.get("service_id") or ""
+            if service_id and (row.get("exception_type") or "") in ("1", "2"):
+                exceptions[service_id][row.get("date") or ""] = int(row["exception_type"])
+        active_services = None
+        if bus_only and (service_days or exceptions):
+            today=datetime.now(TIMEZONE)
+            cal={'service_days':service_days,'exceptions':exceptions}
+            active_services={sid for sid in set(service_days)|set(exceptions)
+                if any(service_active(cal,sid,today+timedelta(days=d)) for d in (-1,0,1,2))}
+            if not active_services: active_services=None  # Do not erase all metadata if feed dates disagree.
         for row in _csv_rows(archive, "trips.txt"):
             tid = (row.get("trip_id") or "").strip()
             if tid:
+                if bus_only and (row.get('route_id') or '').strip() not in routes:
+                    excluded_trips[tid]=True
+                    continue
+                if active_services is not None and (row.get("service_id") or "").strip() not in active_services: continue
                 trips[tid] = {"route_id": (row.get("route_id") or "").strip(),
                               "headsign": (row.get("trip_headsign") or "").strip(),
                               "block_id": (row.get("block_id") or "").strip(),
@@ -354,7 +387,8 @@ def parse_static_gtfs(blob: bytes) -> dict[str, Any]:
             except ValueError:
                 continue
             stops[sid] = [row.get("stop_name") or "Unknown stop", round(lat, 6), round(lon, 6)]
-        for row in _csv_rows(archive, "stop_times.txt"):
+        stop_keys={sid:sid for sid in stops} if bus_only else None
+        for row in _csv_rows(archive, "stop_times.txt", max_size=(512 if bus_only else 180)*1024*1024):
             tid = row.get("trip_id") or ""
             if tid not in trips:
                 continue
@@ -365,7 +399,8 @@ def parse_static_gtfs(blob: bytes) -> dict[str, Any]:
             arrival = _gtfs_time(row.get("arrival_time"))
             departure = _gtfs_time(row.get("departure_time"))
             # No time at non-timepoint stops is normal. Use available endpoints.
-            trip_stops[tid].append([sequence, row.get("stop_id") or "", arrival, departure])
+            sid=row.get("stop_id") or ""
+            trip_stops[tid].append([sequence, stop_keys.get(sid,sid) if stop_keys is not None else sid, arrival, departure])
         for tid, entries in trip_stops.items():
             entries.sort(key=lambda r: r[0])
             times = [v for r in entries for v in r[2:] if v is not None]
@@ -378,20 +413,12 @@ def parse_static_gtfs(blob: bytes) -> dict[str, Any]:
                 blocks[trips[tid]["block_id"]].append(tid)
         for block_trips in blocks.values():
             block_trips.sort(key=lambda tid: trips[tid]["first"])
-        for row in _csv_rows(archive, "calendar.txt", required=False):
-            service_id = row.get("service_id") or ""
-            if service_id:
-                service_days[service_id] = {"start": row.get("start_date") or "", "end": row.get("end_date") or "",
-                    "weekdays": [row.get(day) == "1" for day in ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")]}
-        for row in _csv_rows(archive, "calendar_dates.txt", required=False):
-            service_id = row.get("service_id") or ""
-            if service_id and (row.get("exception_type") or "") in ("1", "2"):
-                exceptions[service_id][row.get("date") or ""] = int(row["exception_type"])
         # Shape points only are prepared for on-demand detail requests, never sent in bulk.
         raw_shapes = defaultdict(list)
-        for row in _csv_rows(archive, "shapes.txt", required=False):
+        needed_shapes={t.get("shape_id") for t in trips.values()} if bus_only else None
+        for row in _csv_rows(archive, "shapes.txt", required=False, max_size=(512 if bus_only else 180)*1024*1024):
             sid = (row.get("shape_id") or "").strip()
-            if not sid:
+            if not sid or (needed_shapes is not None and sid not in needed_shapes):
                 continue
             try:
                 lat, lon = float(row["shape_pt_lat"]), float(row["shape_pt_lon"])
@@ -413,7 +440,7 @@ def parse_static_gtfs(blob: bytes) -> dict[str, Any]:
     return {"routes": routes, "trips": trips, "stops": stops, "trip_stops": dict(trip_stops),
             "shapes": shapes, "route_shapes": route_shapes, "route_short_ids": build_route_short_ids(routes),
             "blocks": dict(blocks), "service_days": service_days,
-            "exceptions": dict(exceptions), "updated_at": int(time.time())}
+            "exceptions": dict(exceptions), "excluded_routes":excluded_routes, "excluded_trips":excluded_trips, "updated_at": int(time.time())}
 
 
 def build_route_shapes(trips: dict[str, Any], shapes: dict[str, Any]) -> dict[str, list[str]]:
@@ -840,8 +867,19 @@ class Tracker:
         self.system_id = system_id
         self.history = history
         self.name = SYSTEMS[system_id]["name"]
+        self.translink = None
+        if system_id == 'vancouver':
+            budget_path = os.getenv('TRANSLINK_BUDGET_DB') or str(Path(os.getenv('BCT_HISTORY_DB') or CACHE_DIR / 'history.sqlite3').parent / 'translink-budget.sqlite3')
+            try:
+                if (os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('RAILWAY_ENVIRONMENT_NAME')) and not (os.getenv('TRANSLINK_BUDGET_DB') or os.getenv('BCT_HISTORY_DB') or os.getenv('RAILWAY_VOLUME_MOUNT_PATH')):
+                    raise RuntimeError('Persistent budget volume required')
+                if os.getenv('RAILWAY_VOLUME_MOUNT_PATH') and not (os.getenv('TRANSLINK_BUDGET_DB') or os.getenv('BCT_HISTORY_DB')):
+                    budget_path=str(Path(os.environ['RAILWAY_VOLUME_MOUNT_PATH'])/'translink-budget.sqlite3')
+                self.translink = TransLink(budget_path)
+            except Exception:
+                print('[vancouver] Budget storage/config unavailable; authenticated requests disabled')
         # Keep static route databases and live vehicles separate per system.
-        self.index_path = CACHE_DIR / f"gtfs_v27_{system_id}.json.gz"
+        self.index_path = (Path(budget_path).parent if system_id == "vancouver" else CACHE_DIR) / f"gtfs_v27_{system_id}.json.gz"
         self.urls = {kind: system_feed_url(system_id, kind) for kind in ("vehicle", "trip", "static", "alerts")}
         self.alerts: dict[str, Any] | None = None
         self.alerts_last_try = 0
@@ -857,13 +895,13 @@ class Tracker:
         self.trip_feed_error: str | None = None
         self.feed_timestamp: int | None = None
         self.fetched_at: int | None = None
-        self.last_error: str | None = None
+        self.last_error: str | None = ("Set TRANSLINK_API_KEY on the server" if system_id == "vancouver" and not (self.translink and self.translink.key) else None)
         self.gtfs_error: str | None = None
         self.revision = 0
         self._snapshot_cache = None
         self._stop_timetable_index = None  # lazy: nearby board never delays startup
         self._visible_stop_cache = None
-        self._load_index()
+        if system_id != "vancouver": self._load_index()
 
     def _load_index(self) -> None:
         try:
@@ -874,7 +912,11 @@ class Tracker:
                     data["route_shapes"] = build_route_shapes(data.get("trips", {}), data.get("shapes", {}))
                 if "route_short_ids" not in data:
                     data["route_short_ids"] = build_route_short_ids(data.get("routes", {}))
-                self.index = data
+                with self.lock:
+                    self.index = data
+                    self._snapshot_cache=None
+                    self._stop_timetable_index=None
+                    self.revision+=1
                 print(f"[GTFS] Loaded local cache: {len(data['trips'])} trips")
         except (OSError, ValueError, TypeError, AttributeError):
             pass
@@ -889,14 +931,14 @@ class Tracker:
             self._stop_timetable_index = None
             self._visible_stop_cache = None
             # A refreshed GTFS shape may differ; retain only matching observations.
-            self.proximity_observations = update_proximity_observations(
-                index, self.vehicles, {}, time.time())
+            self.proximity_observations = ({} if self.system_id == "vancouver" else update_proximity_observations(
+                index, self.vehicles, {}, time.time()))
             self.gtfs_error = None
             self.revision += 1
             self._snapshot_cache = None
         if persist:
             try:
-                CACHE_DIR.mkdir(exist_ok=True)
+                self.index_path.parent.mkdir(parents=True,exist_ok=True)
                 temp = self.index_path.with_suffix(".tmp")
                 with gzip.open(temp, "wt", encoding="utf-8", compresslevel=5) as f:
                     json.dump(index, f, separators=(",", ":"))
@@ -917,8 +959,8 @@ class Tracker:
             # computing NIS proximity or exposing live buses.
             vehicles = [v for v in vehicles if vehicle_in_view(self.system_id, self.index, v)]
             self.vehicles = vehicles
-            self.proximity_observations = update_proximity_observations(
-                self.index, vehicles, self.proximity_observations, time.time())
+            self.proximity_observations = ({} if self.system_id == "vancouver" else update_proximity_observations(
+                self.index, vehicles, self.proximity_observations, time.time()))
             self.feed_timestamp = stamp
             self.fetched_at = int(time.time())
             self.last_error = None
@@ -930,7 +972,7 @@ class Tracker:
         # up live snapshot requests. History failures must not kill the live feed.
         if self.history is not None:
             try:
-                self.history.append(self.system_id, vehicles, self.index, proximity=recorded_proximity)
+                self.history.append(self.system_id, ([v for v in vehicles if v.get("timestamp_source") == "vehicle"] if self.system_id == "vancouver" else vehicles), self.index, proximity=recorded_proximity)
             except Exception as exc:
                 print(f"[{self.system_id}:history] Recording failed: {exc}")
 
@@ -944,6 +986,9 @@ class Tracker:
 
     def get_alerts(self) -> dict[str, Any]:
         """Lazy, bounded 3-minute cache; never slows the primary GPS feed."""
+        if self.system_id == 'vancouver':
+            with self.lock:
+                return {**self.alerts, 'error':self.alerts_error} if self.alerts else {'alerts':[], 'ready':False, 'error':self.alerts_error or 'Awaiting budgeted alert feed'}
         now = time.time()
         with self.lock:
             cached = self.alerts
@@ -1057,24 +1102,26 @@ class Tracker:
                 rid = v.get("route_id") or trip.get("route_id")
                 route = index["routes"].get(rid or "", {})
                 public_route = route.get("short") or None
-                if not public_route and rid and len(rid) <= 4 and rid.replace("X", "").isdigit():
+                if not public_route and rid and len(rid) <= 4 and (rid.replace("X", "").isdigit() or (self.system_id == "vancouver" and rid.startswith("R") and rid[1:].isdigit())):
                     public_route = rid
                 # A shared Fraser Valley feed must never leak unrelated
                 # Abbotsford/Mission vehicles into the local Chilliwack view.
                 if not vehicle_in_view(self.system_id, index, v):
                     continue
                 proximity = self.proximity_observations.get(v.get("id") or "")
-                if not proximity or proximity.get("trip_id") != v.get("trip_id") or proximity.get("timestamp") != v.get("timestamp"):
+                if self.system_id == "vancouver":
+                    proximity={"state":"unknown","basis":"Vancouver off-route inference disabled in alpha"}
+                elif not proximity or proximity.get("trip_id") != v.get("trip_id") or proximity.get("timestamp") != v.get("timestamp"):
                     proximity = update_proximity_observations(index, [v], {}, now.timestamp()).get(v.get("id") or "", {})
                 # If a previously valid GPS observation has since gone stale,
                 # stop claiming a confirmed proximity classification.
-                if not isinstance(v.get("timestamp"), (int, float)) or now.timestamp()-v["timestamp"] > MAX_POSITION_AGE_S:
+                if self.system_id != "vancouver" and (not isinstance(v.get("timestamp"), (int, float)) or now.timestamp()-v["timestamp"] > MAX_POSITION_AGE_S):
                     proximity = route_proximity(index, v, now.timestamp())
                 public_proximity = {key:proximity.get(key) for key in ("state", "distance_m", "basis", "threshold_m", "observations")}
-                enriched.append({**v, **identify_feed_vehicle(self.system_id, v.get("label"), v.get("id")), "route": public_route, "route_name": route.get("long") or None,
+                enriched.append({**v, **identify_feed_vehicle(self.system_id, v.get("label"), v.get("descriptor_id") if self.system_id == "vancouver" else v.get("id")), "route": public_route, "route_name": route.get("long") or None,
                     "route_proximity": public_proximity,
-                    "service_inference": infer_service_label(trip.get("headsign"),route.get("long")),
-                    **route_aligned_bearing(index, v, now.timestamp()),
+                    "service_inference": ({"state":"unknown","basis":"Vancouver inference not enabled"} if self.system_id == "vancouver" else infer_service_label(trip.get("headsign"),route.get("long"))),
+                    **({"display_bearing":v.get("bearing"),"bearing_basis":"GTFS vehicle position"} if self.system_id == "vancouver" else route_aligned_bearing(index, v, now.timestamp())),
                     "headsign": trip.get("headsign") or None, "route_color": route_color(route, rid),
                     "route_text_color": route.get("text_color") or None,
                     "block_id": trip.get("block_id") or None,
@@ -1083,7 +1130,7 @@ class Tracker:
                       "fetched_at": self.fetched_at, "revision": self.revision,
                       "poll_seconds": POLL_SECONDS, "metadata_ready": bool(index["routes"]),
                       "metadata_updated_at": index.get("updated_at"),
-                      "system": self.system_id, "source": f"BC Transit / {self.name}"}
+                      "system": self.system_id, "source": ("TransLink" if self.system_id == "vancouver" else f"BC Transit / {self.name}")}
             self._snapshot_cache = result
             return {**result, "server_now": int(time.time()), "error": self.last_error,
                     "metadata_error": self.gtfs_error, "system": self.system_id}
@@ -1119,7 +1166,19 @@ class Tracker:
         start_window, end_window = now_ts - 60, now_ts + 5400
         with self.lock:
             index = self.index
-            if self._stop_timetable_index is None:
+            if self.system_id == 'vancouver':
+                if self._stop_timetable_index is None: self._stop_timetable_index={}
+                missing=set(ids)-self._stop_timetable_index.keys()
+                if missing:
+                    by_stop={sid:[] for sid in missing}
+                    for trip_id, rows in index.get('trip_stops',{}).items():
+                        for row in rows:
+                            if len(row)>=4 and row[1] in missing:
+                                sec=row[2] if row[2] is not None else row[3]
+                                if sec is not None: by_stop[row[1]].append((trip_id,int(sec)))
+                    if len(self._stop_timetable_index)>100: self._stop_timetable_index.clear()
+                    self._stop_timetable_index.update(by_stop)
+            elif self._stop_timetable_index is None:
                 by_stop = defaultdict(list)
                 for trip_id, stops in index.get('trip_stops', {}).items():
                     if not trip_in_view(self.system_id, index, trip_id):
@@ -1312,7 +1371,13 @@ def _trip_worker(tracker: Tracker) -> None:
 
 
 def _static_worker(tracker: Tracker) -> None:
+    loaded=False
     while True:
+        if tracker.system_id == 'vancouver' and not (tracker.translink and tracker.translink.key and tracker.translink.active()):
+            time.sleep(5)
+            continue
+        if tracker.system_id == "vancouver" and not loaded:
+            tracker._load_index(); loaded=True
         age = time.time() - (tracker.index.get("updated_at") or 0)
         if age < 24*3600:
             time.sleep(min(300, max(30, 24*3600-age)))
@@ -1320,7 +1385,8 @@ def _static_worker(tracker: Tracker) -> None:
         try:
             print("[GTFS] Fetching stops, shapes, trips and vehicle blocks...")
             with STATIC_PARSE_LOCK:
-                index = parse_static_gtfs(fetch_bytes(tracker.urls["static"], MAX_ZIP_BYTES))
+                blob=fetch_bytes(tracker.urls["static"], MAX_ZIP_BYTES)
+                index = parse_static_gtfs(blob, bus_only=True) if tracker.system_id == "vancouver" else parse_static_gtfs(blob)
                 tracker.update_index(index)
             print(f"[GTFS] {len(index['routes'])} routes, {len(index['trips'])} trips, "
                   f"{len(index['blocks'])} scheduled blocks, {len(index['shapes'])} shapes")
@@ -1329,6 +1395,41 @@ def _static_worker(tracker: Tracker) -> None:
                 tracker.gtfs_error = f"Schedule data: {exc}"
             print(f"[GTFS] ERROR: {exc}")
             time.sleep(600)
+
+
+def _translink_worker(tracker: Tracker) -> None:
+    provider = tracker.translink
+    if not provider or not provider.key:
+        return
+    while True:
+        try:
+            if provider.active():
+                status = provider.status()
+                intervals = {'vehicle':status['gps_seconds'], 'trip':max(120,status['gps_seconds']*4), 'alerts':600}
+                for kind in ('vehicle','trip','alerts'):
+                    if not provider.active(): break
+                    if time.monotonic()-provider.last_try[kind]<intervals[kind]: continue
+                    if status['by_feed'][kind]>=status['caps'][kind]: continue
+                    try:
+                        body=provider.fetch(kind,MAX_FEED_BYTES)
+                        if body is None: continue
+                        if kind=='vehicle': tracker.update_feed(body)
+                        elif kind=='trip': tracker.update_trip_feed(body)
+                        else:
+                            parsed=parse_alert_feed(body,gtfs_realtime_pb2)
+                            with tracker.lock:
+                                tracker.alerts={**parsed,'ready':True}; tracker.alerts_error=None
+                    except Exception:
+                        # Do not log raw URL or exception (may contain credentials).
+                        msg=provider.error or 'TransLink feed could not be decoded'
+                        provider.last_try[kind]=time.monotonic()
+                        with tracker.lock:
+                            if kind=='vehicle': tracker.last_error=msg
+                            elif kind=='trip': tracker.trip_feed_error=msg
+                            else: tracker.alerts_error=msg
+        except Exception:
+            with tracker.lock: tracker.last_error='TransLink budget storage unavailable; requests paused'
+        time.sleep(2)
 
 
 mimetypes.add_type("application/manifest+json", ".webmanifest")
@@ -1365,7 +1466,16 @@ class Handler(SimpleHTTPRequestHandler):
             params = urllib.parse.parse_qs(parsed.query)
             try: since = int(params.get("since", [""])[0])
             except ValueError: since = None
-            self._json(tracker.snapshot(since))
+            if tracker.system_id == 'vancouver':
+                provider=tracker.translink
+                if provider: provider.touch()
+                data=tracker.snapshot(since)
+                try: budget=provider.status() if provider else {'configured':False}
+                except Exception: budget={'configured':False,'storage_error':True}
+                data.update(api_budget=budget, poll_seconds=budget.get('gps_seconds',20))
+                self._json(data)
+            else:
+                self._json(tracker.snapshot(since))
             return
         if parsed.path == "/api/alerts":
             self._json(tracker.get_alerts())
@@ -1453,7 +1563,11 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/health":
             snap = tracker.snapshot()
-            self._json({k:v for k,v in snap.items() if k != "vehicles"})
+            health={k:v for k,v in snap.items() if k != "vehicles"}
+            if tracker.system_id=="vancouver" and tracker.translink:
+                try: health["api_budget"]=tracker.translink.status()
+                except Exception: health["api_budget"]={"configured":False,"storage_error":True}
+            self._json(health)
             return
         if parsed.path == "/":
             self.path = "/index.html"
@@ -1488,7 +1602,7 @@ class Handler(SimpleHTTPRequestHandler):
             # The SW owns immutable versioned app files; avoid stale HTML/manifest.
             if path in ("/", "/index.html", "/fleet-gallery.html", "/sw.js", "/manifest.webmanifest"):
                 self.send_header("Cache-Control", "no-cache, must-revalidate")
-            elif path in ("/pwa.js", "/app.js", "/style.css", "/classic.css", "/classic-dark.css", "/mobile.css", "/v27.css", "/v28.css", "/v30.css", "/v30b.css", "/v30rc.css", "/config.js"):
+            elif path.endswith((".css", ".js")) or path in ("/pwa.js", "/app.js", "/style.css", "/classic.css", "/classic-dark.css", "/mobile.css", "/v27.css", "/v28.css", "/v30.css", "/v30b.css", "/v30rc.css", "/config.js"):
                 self.send_header("Cache-Control", "no-cache")
             else:
                 self.send_header("Cache-Control", "public, max-age=86400")
@@ -1498,7 +1612,7 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 def run() -> None:
-    parser = argparse.ArgumentParser(description="BC Transit Bus Radar V3.3 (multi-system web + Android PWA)")
+    parser = argparse.ArgumentParser(description="Bus Radar V4.0 Alpha (multi-system web + Android PWA)")
     parser.add_argument("--host", default="127.0.0.1", help="Bind address; use 0.0.0.0 only behind a trusted host")
     parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", "8765")))
     parser.add_argument("--no-browser", action="store_true")
@@ -1523,11 +1637,14 @@ def run() -> None:
     except OSError as exc:
         raise SystemExit(f"Cannot start server on port {args.port}: {exc}") from exc
     for tracker in trackers.values():
-        threading.Thread(target=_vehicle_worker, args=(tracker,), daemon=True).start()
-        threading.Thread(target=_trip_worker, args=(tracker,), daemon=True).start()
+        if tracker.system_id == 'vancouver':
+            threading.Thread(target=_translink_worker, args=(tracker,), daemon=True).start()
+        else:
+            threading.Thread(target=_vehicle_worker, args=(tracker,), daemon=True).start()
+            threading.Thread(target=_trip_worker, args=(tracker,), daemon=True).start()
         threading.Thread(target=_static_worker, args=(tracker,), daemon=True).start()
     url = f"http://127.0.0.1:{args.port}"
-    print(f"\nBC Transit Bus Radar V3.3 — serving on {args.host}:{args.port}\n"
+    print(f"\nBus Radar V4.0 Alpha — serving on {args.host}:{args.port}\n"
           f"Local URL: {url}\nPress Ctrl+C to stop.\n")
     if not args.no_browser:
         threading.Timer(0.6, lambda: webbrowser.open(url)).start()

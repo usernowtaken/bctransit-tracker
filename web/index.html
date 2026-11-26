@@ -5,38 +5,41 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#f7f7f7" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Bus Radar" />
-  <meta name="application-name" content="BC Transit Bus Radar" />
+  <meta name="application-name" content="Bus Radar" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-  <meta name="description" content="An independent, lightweight live bus tracker for the multiple British Columbia transit systems, using BC Transit public data." />
-  <title>BC Transit Bus Radar — Live Tracker</title>
+  <meta name="description" content="An independent, lightweight live bus tracker for the multiple British Columbia transit systems, using BC Transit and TransLink public data." />
+  <title>Bus Radar — Live Tracker</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="preconnect" href="https://unpkg.com" crossorigin />
   <link rel="preconnect" href="https://a.basemaps.cartocdn.com" crossorigin />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="/style.css?v=3.0" />
-  <link rel="stylesheet" href="/classic.css?v=3.0" />
-  <link rel="stylesheet" href="/classic-dark.css?v=3.0" />
-  <link rel="stylesheet" href="/mobile.css?v=3.0" />
-  <link rel="stylesheet" href="/v27.css?v=3.0" />
-  <link rel="stylesheet" href="/v28.css?v=3.0" />
-  <link rel="stylesheet" href="/v30.css?v=3.0.5" />
-  <link rel="stylesheet" href="/v30b.css?v=3.0" />
-  <link rel="stylesheet" href="/v30rc.css?v=3.0" />
+  <link rel="stylesheet" href="/style.css?v=4.0-alpha" />
+  <link rel="stylesheet" href="/classic.css?v=4.0-alpha" />
+  <link rel="stylesheet" href="/classic-dark.css?v=4.0-alpha" />
+  <link rel="stylesheet" href="/mobile.css?v=4.0-alpha" />
+  <link rel="stylesheet" href="/v27.css?v=4.0-alpha" />
+  <link rel="stylesheet" href="/v28.css?v=4.0-alpha" />
+  <link rel="stylesheet" href="/v30.css?v=4.0-alpha" />
+  <link rel="stylesheet" href="/v30b.css?v=4.0-alpha" />
+  <link rel="stylesheet" href="/v30rc.css?v=4.0-alpha" />
   <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script defer src="/config.js"></script>
   <script defer src="/motion.js?v=3.4.0"></script>
-  <script defer src="/app.js?v=3.4.11-gen4art"></script>
-  <script defer src="/pwa.js?v=3.4.11-gen4art"></script>
-  <link rel="stylesheet" href="/v307.css?v=3.0.7" />
-  <link rel="stylesheet" href="/v31.css?v=3.1.0" />
-  <link rel="stylesheet" href="/v32.css?v=3.2.0" />
-  <link rel="stylesheet" href="/v33.css?v=3.3.0" />
-  <link rel="stylesheet" href="/v34.css?v=3.4.1" />
-  <link rel="stylesheet" href="/v342.css?v=3.4.2" />
-  <link rel="stylesheet" href="/v343.css?v=3.4.11" />
+  <script defer src="/app.js?v=4.0-alpha"></script>
+  <script defer src="/pwa.js?v=4.0-alpha"></script>
+  <link rel="stylesheet" href="/v307.css?v=4.0-alpha" />
+  <link rel="stylesheet" href="/v31.css?v=4.0-alpha" />
+  <link rel="stylesheet" href="/v32.css?v=4.0-alpha" />
+  <link rel="stylesheet" href="/v33.css?v=4.0-alpha" />
+  <link rel="stylesheet" href="/v34.css?v=4.0-alpha" />
+  <link rel="stylesheet" href="/v342.css?v=4.0-alpha" />
+  <link rel="stylesheet" href="/v343.css?v=4.0-alpha" />
+  <link rel="stylesheet" href="/mobile-next.css?v=4.0-alpha" />
+  <link rel="stylesheet" href="/apple.css?v=4.0-alpha" />
 </head>
 <body>
   <div class="app-shell">
@@ -50,8 +53,8 @@
               <path d="M8 15h16M11 24v4m10-4v4" /><circle cx="11" cy="19" r="1" fill="currentColor"/><circle cx="21" cy="19" r="1" fill="currentColor"/><path d="M13 9h6" />
             </svg>
           </div>
-          <div class="brand-text"><span class="brand-kicker"><span id="regionName">GREATER VICTORIA</span></span><h1>BUS<span>RADAR</span><span class="version">V3.4.11</span></h1></div>
-          <button id="sidebarClose" class="icon-button sidebar-close" aria-label="Hide sidebar" title="Hide sidebar">✕</button>
+          <div class="brand-text"><span class="brand-kicker"><span id="regionName">GREATER VICTORIA</span></span><h1>BUS<span>RADAR</span><span class="version">V4.0 Alpha</span></h1></div>
+          <button id="sidebarClose" class="icon-button sidebar-close" aria-label="Hide sidebar" title="Hide sidebar"><span class="sidebar-close-label">✕</span></button>
         </div>
       </div>
 
@@ -59,7 +62,7 @@
         <label class="section-label" for="routeSearch">Search <span class="key-hint">/</span></label>
         <div class="search-wrap">
           <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg>
-          <input id="routeSearch" type="search" placeholder="Route, destination, bus #" spellcheck="false" autocomplete="off" />
+          <input id="routeSearch" enterkeyhint="search" autocapitalize="off" autocorrect="off" spellcheck="false" type="search" placeholder="Route, destination, bus #" autocomplete="off" />
           <button id="clearSearch" class="clear-search" aria-label="Clear route filter" title="Show all routes" hidden>✕</button>
         </div>
         <div class="quick-routes" id="quickRoutes" aria-label="Quick route filters">
@@ -122,15 +125,30 @@
             <option value="xe40">New Flyer XE40</option>
             <option value="enviro500">Enviro500</option>
             <option value="enviro500mmc">Enviro500 MMC</option>
+            <option value="tl_lfs">NovaBus LFS (2007)</option>
+            <option value="tl_xd40">New Flyer XD40</option>
+            <option value="tl_e40">New Flyer E40LFR trolleybus</option>
+            <option value="tl_e60">New Flyer E60LFR articulated trolleybus</option>
+            <option value="tl_de60">New Flyer DE60LFR hybrid</option>
+            <option value="tl_lfshev">NovaBus LFS HEV</option>
+            <option value="tl_xn40">New Flyer XN40 CNG</option>
+            <option value="tl_lfssub">NovaBus LFS Suburban</option>
+            <option value="tl_lfse">NovaBus LFSe+</option>
+            <option value="tl_lfscng">NovaBus LFS CNG</option>
+            <option value="tl_xde60">New Flyer XDE60 hybrid articulated</option>
+            <option value="tl_enviro">Alexander Dennis Enviro500 MMC</option>
+            <option value="tl_arboc">ARBOC community shuttle</option>
+            <option value="tl_girardin">Girardin G5 community shuttle</option>
+            <option value="tl_solaris12">Solaris Trollino 12</option>
             <option value="generic">Other / unknown</option>
           </select>
-          <p class="fleet-gallery-link"><a href="/fleet-gallery.html?v=3.4.11-gen4art" target="_blank" rel="noopener noreferrer">Fleet illustration gallery</a></p>
+          <p class="fleet-gallery-link"><a href="/fleet-gallery.html?v=4.0-alpha" target="_blank" rel="noopener noreferrer">Fleet illustration gallery</a></p>
           <label for="densitySelect">Sidebar spacing</label><select id="densitySelect"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select>
           <label for="markerSizeSelect">Bus label size</label><select id="markerSizeSelect"><option value="small">Small</option><option value="normal">Normal</option><option value="large">Large</option></select>
           <label class="preferences-checkbox"><input id="routeColorsToggle" type="checkbox" checked /> Use route colours</label>
           <label class="preferences-checkbox"><input id="lowBandwidthToggle" type="checkbox" /> Data saver: fewer browser checks</label>
           <label class="preferences-checkbox"><input id="smoothMotionToggle" type="checkbox" checked /> Smooth selected bus marker (short estimate)</label>
-          <div class="system-health"><div class="system-health-header"><strong>Feed status by region</strong><button id="checkSystemHealth" type="button" class="mini-button">Check</button></div><div id="systemHealthList">Check to see data freshness for all three systems.</div></div>
+          <div class="system-health"><div class="system-health-header"><strong>Feed status by region</strong><button id="checkSystemHealth" type="button" class="mini-button">Check</button></div><div id="systemHealthList">Check to see data freshness for all four systems.</div></div>
           
         </div>
       </details>
@@ -255,13 +273,14 @@
       </section>
 
       <footer class="sidebar-footer">
-        <div class="data-notice"><span class="data-led"></span><span>DATA: <a href="https://www.bctransit.com/open-data/" target="_blank" rel="noopener noreferrer">BC Transit Open Data</a></span></div>
-        <div>Independent project · Not affiliated with BC Transit</div>
+        <div id="bctFooter"><div class="data-notice"><span class="data-led"></span><span>DATA: <a href="https://www.bctransit.com/open-data/" target="_blank" rel="noopener noreferrer">BC Transit Open Data</a></span></div>
+        <div>Independent project · Not affiliated with BC Transit</div></div>
+        <div id="tlFooter" hidden><p id="tlBudgetFooter"></p><p>Route and arrival data used in this product or service is provided by permission of TransLink. TransLink assumes no responsibility for the accuracy or currency of the Data used in this product or service.</p><div>Independent project · Not affiliated with TransLink</div></div>
       </footer>
     </aside>
 
-    <main class="map-main" aria-label="BC Transit live bus map">
-      <div id="map" aria-label="Interactive map of BC Transit buses"></div>
+    <main class="map-main" aria-label="Live transit bus map">
+      <div id="map" aria-label="Interactive map of buses"></div>
       <div id="v34MapCentre" class="v34-map-centre" aria-hidden="true"><span class="v34-centre-dot"></span></div>
       <div id="mapUnavailable" class="map-unavailable" hidden>Map library unavailable. Check your internet connection and reload the page.</div>
 
@@ -276,13 +295,14 @@
             <option value="chilliwack">Chilliwack / FVX</option>
             <option value="kelowna">Kelowna</option>
             <option value="cowichan">Cowichan Valley</option>
+            <option value="vancouver">Metro Vancouver (Alpha)</option>
           </select></label>
         </div>
         <div class="top-right">
           <button id="liteToggle" class="top-button lite-toggle" type="button" aria-label="Toggle lightweight map mode" title="Toggle lightweight map mode" aria-pressed="false">Lite</button>
           <div class="status-pill" id="statusPill" role="status"><span class="status-dot"></span><span id="statusText">CONNECTING</span></div>
           <span class="freshness" id="freshness">Awaiting positions</span>
-          <button id="installButton" class="top-button install-button" type="button" hidden title="Install BC Transit Bus Radar" aria-label="Install app to home screen">
+          <button id="installButton" class="top-button install-button" type="button" hidden title="Install Bus Radar" aria-label="Install app to home screen">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2v12m-4-4 4 4 4-4M5 17v4h14v-4"/></svg>
           </button>
           <button id="themeToggle" class="top-button theme-toggle" type="button" title="Switch to dark map" aria-label="Switch to dark map" aria-pressed="true">
@@ -306,8 +326,12 @@
           <small class="v32-board-note">● Live = realtime · Sched = timetable. Swipe sideways to change destination.</small>
         </div>
       </details>
-      <button id="locateButton" class="locate-button" type="button" title="Show my location and nearby buses" aria-label="Show my location and nearby buses" aria-pressed="false">◎ <span>Near me</span></button>
+      <nav class="mobile-actions" aria-label="Mobile map controls">
       <button id="mobileOpen" class="mobile-open" type="button" aria-label="Show bus routes and search">☰ <span id="mobileOpenText">Routes</span></button>
+      <button id="mobileDepartures" class="mobile-departures" type="button" aria-controls="nearbyBoard" aria-expanded="false">◷ <span>Departures</span></button>
+      <button id="locateButton" class="locate-button" type="button" title="Show my location and nearby buses" aria-label="Show my location and nearby buses" aria-pressed="false">◎ <span>Near me</span></button>
+      </nav>
+      <div id="tlLegend" hidden><span id="tlBudget"></span><span class="tl-credit">Route and arrival data used in this product or service is provided by permission of TransLink. TransLink assumes no responsibility for the accuracy or currency of the Data used in this product or service.</span></div>
       <div class="map-bottom">
         <div class="map-help"><span class="small-bus-icon">▰</span> Select a bus for details</div>
         <span class="refresh-note" id="refreshNote">GPS update frequency varies</span>
@@ -352,8 +376,17 @@
         <label class="v34-check"><input id="v34Hover" type="checkbox" checked><span>Desktop hover previews nearby routes</span></label>
         <label class="v34-check"><input id="v34Tap" type="checkbox" checked><span>Tap the map to inspect nearby routes</span></label>
       </section>
+      <section class="v34-settings-group" id="installHelpSection" hidden aria-label="Home Screen installation"><h3>Home Screen</h3><button id="installHelpButton" type="button" class="install-help-button">Install Bus Radar</button></section>
+      <button class="mobile-reset" id="mobileReset" type="button">Reset map view</button>
       <div class="v34-settings-foot"><button type="button" id="v34ResetSettings">Restore display defaults</button><button type="button" id="v34DoneSettings">Done</button></div>
     </div>
+  </dialog>
+  <dialog id="installHelp" class="install-help-dialog" aria-labelledby="installHelpTitle">
+    <h2 id="installHelpTitle">Add Bus Radar to your Home Screen</h2>
+    <p>Open this website in Safari on your iPhone or iPad.</p>
+    <ol><li>Tap the Share button (on some versions, open the More menu first).</li><li>Choose <strong>Add to Home Screen</strong>. You may need to scroll down.</li><li>Turn on <strong>Open as Web App</strong> if shown, then tap <strong>Add</strong>.</li></ol>
+    <p>Open Bus Radar from its new Home Screen icon. Live bus tracking needs an internet connection.</p>
+    <button id="installHelpClose" type="button" autofocus>Done</button>
   </dialog>
   <dialog id="locationConsent" class="location-consent" aria-labelledby="locationConsentTitle">
     <h2 id="locationConsentTitle">Show your location?</h2>

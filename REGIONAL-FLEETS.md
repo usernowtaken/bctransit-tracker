@@ -1,4 +1,8 @@
-# Regional BC Transit fleet lookup — V3.4.11
+# V4.0 Alpha: Metro Vancouver
+
+See `translink_fleet.py` for preliminary production-series mapping from the planning research. These ranges are not a validated active roster, and descriptor IDs and depot prefixes still need live verification. Vancouver has no supplied artwork; all models intentionally use PLACEHOLDER / N/A. BC Transit ranges below are unchanged.
+
+# Regional BC Transit fleet lookup — V3.4.13
 
 **Important:** These tables are production-family candidates. Some named buses
 are historical assignments, not guarantees of 2026 operation. Fleet numbers
@@ -103,7 +107,7 @@ planning but not independently corroborated by the above references; keep
 explicitly *provisional*. The 70xx LFSe+ subtype is also provisional by unit.
 
 
-## V3.4.11 artwork mapping notes
+## V3.4.12 artwork mapping notes
 
 - `vicinity30cng` now reuses the supplied `vicinity30.png` as its reference image.
 - `vicinity35` now uses the supplied transparent `vicinity35.png`.

@@ -20,7 +20,7 @@
 .activity-entry.kind-gap,.activity-entry.kind-unreported{border-left-color:#858b91}
 .activity-locate{flex-shrink:0;min-width:53px;min-height:36px}
 html[data-theme="dark"] .activity-controls button[aria-pressed="true"]{background:#295a7b;color:#fff;border-color:#7c9eb4}
-@media (max-width:720px){
+@media (max-width:720px), (max-width:1100px) and (max-height:550px) and (any-pointer:coarse), (min-width:721px) and (max-width:1100px) and (orientation:portrait) and (any-pointer:coarse){
  .activity-controls button,.activity-controls select{min-height:44px}
  .activity-entry{min-height:66px;padding:9px}
  .activity-locate{min-height:44px;min-width:58px}

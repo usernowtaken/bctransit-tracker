@@ -71,7 +71,7 @@ html[data-v34-text="xlarge"] :is(.bus-name,.detail-destination,.v33-direction-la
 .v34-settings-foot{display:flex;justify-content:space-between;gap:10px;padding:14px 0 0}
 .v34-settings-foot button{min-height:45px;padding:7px 12px;font-size:12px;border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:6px}
 .v34-settings-foot #v34DoneSettings{font-weight:700;min-width:95px}
-@media(max-width:720px){
+@media (max-width:720px), (max-width:1100px) and (max-height:550px) and (any-pointer:coarse), (min-width:721px) and (max-width:1100px) and (orientation:portrait) and (any-pointer:coarse){
  .v34-settings{max-height:calc(100dvh - 18px);width:calc(100vw - 16px);border-radius:11px}
  .v34-settings-scroll{max-height:calc(100dvh - 18px - 107px);padding:3px 14px 18px}
  .v34-settings-head{padding:14px 14px 12px}

@@ -30,7 +30,7 @@
 .v31-activity-stat small{display:block;color:var(--muted);font-size:10px;margin-bottom:2px}
 .v31-activity-stat strong{display:block;overflow-wrap:anywhere;font-size:12px}
 .v31-activity-stat-wide{grid-column:1/-1}
-@media(max-width:720px){.v31-profile-actions button{min-height:46px}.v31-favorite-remove{min-width:44px;min-height:44px}.v31-alerts>summary{min-height:46px}}
+@media (max-width:720px), (max-width:1100px) and (max-height:550px) and (any-pointer:coarse), (min-width:721px) and (max-width:1100px) and (orientation:portrait) and (any-pointer:coarse){.v31-profile-actions button{min-height:46px}.v31-favorite-remove{min-width:44px;min-height:44px}.v31-alerts>summary{min-height:46px}}
 
 .v31-alerts[hidden]{display:none!important}
 .v31-shared-vehicle[hidden]{display:none!important}

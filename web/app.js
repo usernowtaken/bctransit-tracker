@@ -7,10 +7,11 @@
     victoria: {name:'Greater Victoria', center:{lat:48.48, lon:-123.49, zoom:10}, shortcuts:['4','14','50','95']},
     chilliwack: {name:'Chilliwack / FVX', center:{lat:49.157, lon:-121.951, zoom:11}, shortcuts:['51','52','53','66']},
     kelowna: {name:'Kelowna', center:{lat:49.887, lon:-119.496, zoom:11}, shortcuts:['1','8','97']},
+    vancouver: {name:'Metro Vancouver', center:{lat:49.22, lon:-123.02, zoom:10}, shortcuts:['99','R1','R4','R5','20']},
     cowichan: {name:'Cowichan Valley', center:{lat:48.790, lon:-123.708, zoom:10}, shortcuts:['2','4','7','66','99']},
   };
   const DEFAULT_SYSTEM = 'victoria';
-  const MODEL_ASSETS = new Set(['vicinity30','vicinity30cng','vicinity35','vicinity_2013','nova_gen2','nova_gen3','nova_gen4','nova_lfse','light_duty','xn40','xe40','enviro500','enviro500mmc','generic']);
+  const MODEL_ASSETS = new Set(['vicinity30','vicinity30cng','vicinity35','vicinity_2013','nova_gen2','nova_gen3','nova_gen4','nova_lfse','light_duty','xn40','xe40','enviro500','enviro500mmc','generic','tl_lfs','tl_xd40','tl_e40','tl_e60','tl_de60','tl_lfshev','tl_xn40','tl_lfssub','tl_lfse','tl_lfscng','tl_xde60','tl_enviro','tl_arboc','tl_girardin','tl_solaris12']);
   // NovaBus *generations* are independent of which reference illustration is displayed.
   const NOVA_GENERATION_FILTERS = Object.freeze({nova_gen2:2,nova_gen3:3,nova_gen4:4});
   // Every illustration below is an EXACT pixel crop from the uploaded full.png.
@@ -96,6 +97,7 @@
   // remain flat. No cycling and no extra image requests.
   const isUnverifiedNova = () => false;
   const busArtVariant = (vehicle) => {
+    if (state.system === 'vancouver') return null;
     // Only genuinely unsupplied regional models should remain
     // PLACEHOLDER / N/A rather than borrowing the wrong drawing.
     // All regional Gen 4 Nova buses use the supplied Gen 3 drawing as a
@@ -165,7 +167,7 @@
   }
   const distanceLabel=(meters) => meters < 1000 ? `${Math.round(meters)} m` : `${(meters/1000).toFixed(1)} km`;
   const localDistance=(v)=>state.userLocation?metersBetween(state.userLocation.lat,state.userLocation.lon,v.lat,v.lon):Infinity;
-  const mobile = () => window.matchMedia('(max-width: 720px)').matches;
+  const mobile = () => window.matchMedia('(max-width:720px), (max-width:1100px) and (max-height:550px) and (any-pointer:coarse), (min-width:721px) and (max-width:1100px) and (orientation:portrait) and (any-pointer:coarse)').matches;
   const arrivalFormatter = new Intl.DateTimeFormat('en-CA', {timeZone:'America/Vancouver', hour:'2-digit', minute:'2-digit', hour12:false});
   const lowMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const visualMotion = () => !lowMotion() && state.customization.animations !== 'none';
@@ -195,6 +197,7 @@
     nearbyStopMarker: null,
     nearbyStopToken: 0,
     locationRequestPending: false,
+    locationRequestSerial: 0,
     lastClientPollAt: 0,
     lastArrivalRefreshAt: 0,
     pendingNearestSort: false,
@@ -318,7 +321,14 @@
   }
 
   function status() {
+    if(navigator.onLine===false)return {text:'OFFLINE',cls:'stale',sub:'Last available data only'};
     const data = state.data;
+    if (state.system === 'vancouver' && data?.api_budget) {
+      const b=data.api_budget;
+      if(!b.configured) return {text:'SETUP',cls:'error',sub:'TransLink API key or budget storage required'};
+      if(b.blocked) return {text:'FEED PAUSED',cls:'stale',sub:'TransLink retry backoff · last GPS only'};
+      if(b.by_feed?.vehicle>=b.caps?.vehicle) return {text:'GPS LIMIT',cls:'stale',sub:'GPS budget exhausted · last GPS only'};
+    }
     if (!data) return { text: 'CONNECTING', cls: '', sub: 'Awaiting GPS positions' };
     const stamps = state.vehicles.map((v) => Number(v.timestamp || 0));
     const newest = stamps.length ? Math.max(...stamps) : 0;
@@ -345,7 +355,13 @@
     $('routeCount').textContent = state.data
       ? new Set(state.vehicles.map((v) => v.route).filter(Boolean)).size.toLocaleString()
       : '—';
-    $('refreshNote').textContent = `GPS refresh: ~${state.data?.poll_seconds || 15}s`;
+    const b=state.data?.api_budget;
+    const tl=state.system==='vancouver';
+    $('tlLegend').hidden=!tl; $('tlFooter').hidden=!tl;
+    $('bctFooter').hidden=tl;
+    $('tlBudget').textContent=tl ? (b?.configured ? `${b.used}/${b.limit} requests · GPS ~${b.gps_seconds}s · ${b.caps.vehicle-b.by_feed.vehicle} GPS requests left` : 'Waiting for TransLink configuration') : '';
+    $('refreshNote').textContent = `GPS refresh: ~${state.data?.poll_seconds || (tl?20:15)}s`;
+    $('tlBudgetFooter').textContent=$('tlBudget').textContent;
     $('statusPill').title += ` · Source interval ~${state.data?.poll_seconds || 15}s`;
     if (state.selected && (!mobile() || !state.closed)) updateDetails();
   }
@@ -365,7 +381,7 @@
     $('resultCount').textContent = filtered.length.toLocaleString();
     let hint = ''; 
     if (!state.data) hint = 'Connecting to the live feed…';
-    else if (state.data.error || state.clientError) hint = 'Live feed unavailable. Showing last received positions, if any.';
+    else if (state.data.error || state.clientError) hint = state.system==='vancouver' ? (state.data.error || 'Live feed unavailable') : 'Live feed unavailable. Showing last received positions, if any.';
     else if (state.restoredCache) hint = 'Previously cached positions; checking for new data…';
     else if (state.data.fetched_at && !state.data.metadata_ready)
       hint = 'Loading route numbers from schedule data. Some routes may show “?”.';
@@ -373,11 +389,12 @@
     $('listHint').hidden = !hint;
     // Skip needless DOM churn when GPS coordinates change but fleet list text doesn't.
     // Still refresh when the displayed GPS-age bucket changes.
-    const signature = `${state.system}|${state.groupMode}|${state.density}|${[...state.expandedGroups].join(',')}|${state.query}|${state.sortBy}|${state.serviceFilter}|${state.modelFilter}|${state.userLocation?.lat ?? ''}|${state.userLocation?.lon ?? ''}|${state.selected}|${filtered.length}|${filtered.slice(0, MAX_LIST).map(v => [v.id, v.route, v.headsign, v.label, v.fleet_number, v.model_key, v.route_proximity?.state, v.service_inference?.state, Math.floor(Number(v.timestamp || 0)/60)].join(':')).join('|')}`;
+    const signature = `${state.system}|${state.groupMode}|${state.density}|${[...state.expandedGroups].join(',')}|${state.query}|${state.sortBy}|${state.serviceFilter}|${state.modelFilter}|${state.userLocation?.lat ?? ''}|${state.userLocation?.lon ?? ''}|${state.selected}|${filtered.length}|${(state.system==='vancouver' && state.groupMode!=='none' ? filtered : filtered.slice(0,MAX_LIST)).map(v => [v.id, v.route, v.headsign, v.label, v.fleet_number, v.model_key, v.route_proximity?.state, v.service_inference?.state, Math.floor(Number(v.timestamp || 0)/60)].join(':')).join('|')}`;
     if (signature === lastListSignature && hint === lastListStatus) return;
     lastListSignature = signature;
     lastListStatus = hint;
-    const previousScroll = list.scrollTop;
+    const scrollOwner = mobile() ? $('sidebar') : list;
+    const previousScroll = scrollOwner.scrollTop;
 
     const fragment = document.createDocumentFragment();
     // Route and direction grouping is DOM-only; the backend still sends one
@@ -409,7 +426,7 @@
     };
     if (!filtered.length) {
       const empty = document.createElement('div'); empty.className = 'empty-state';
-      empty.textContent = !state.data ? 'Waiting for BC Transit to respond…'
+      empty.textContent = !state.data ? 'Waiting for transit feed to respond…'
         : state.query ? 'No currently reported buses match this search.'
           : 'No vehicle positions are currently available.';
       fragment.appendChild(empty);
@@ -417,7 +434,7 @@
       filtered.slice(0, MAX_LIST).forEach((vehicle) => fragment.appendChild(vehicleRow(vehicle)));
     } else {
       const groups = new Map();
-      for (const vehicle of filtered.slice(0, MAX_LIST)) {
+      for (const vehicle of (state.system==='vancouver'?filtered:filtered.slice(0,MAX_LIST))) {
         const key = String(vehicle.route || '?');
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(vehicle);
@@ -478,8 +495,8 @@
       }
     }
     list.replaceChildren(fragment);
-    list.scrollTop = previousScroll;
-    $('listMore').hidden = filtered.length <= MAX_LIST;
+    scrollOwner.scrollTop = previousScroll;
+    $('listMore').hidden = filtered.length <= MAX_LIST || (state.system==='vancouver' && state.groupMode!=='none');
     if (filtered.length > MAX_LIST) $('listMore').textContent = `Showing first ${MAX_LIST} of ${filtered.length} buses. Filter by route to narrow results.`;
   }
   // Vehicle amenities are informational fleet attributes, never inferred from GPS.
@@ -487,6 +504,7 @@
   function updateAmenities(vehicle) {
     const host=$('amenitiesList'); if (!host) return;
     host.replaceChildren();
+    if(state.system==='vancouver'){host.textContent='Vehicle amenities not independently verified for this fleet.';return;}
     const fleet=Number(vehicle.fleet_number);
     const model=vehicle.model_key;
     const victoria=state.system==='victoria';
@@ -527,8 +545,8 @@
     $('detailDestination').textContent = displayName(vehicle);
     const fleetNumber = vehicle.fleet_number;
     $('detailFleet').textContent = fleetNumber ? `Bus #${fleetNumber}` : 'Bus number unknown';
-    $('detailFleetConfidence').textContent = fleetNumber ? '' : 'Fleet number unavailable';
-    $('detailFleetConfidence').hidden = Boolean(fleetNumber);
+    $('detailFleetConfidence').textContent = fleetNumber ? (state.system==='vancouver'?'Roster candidate · unverified':'') : 'Fleet number unavailable';
+    $('detailFleetConfidence').hidden = Boolean(fleetNumber) && state.system!=='vancouver';
     const smart9434 = state.system === 'victoria' && String(fleetNumber) === '9434' && vehicle.model_key === 'nova3';
     $('detailModel').textContent = smart9434 ? 'NovaBus LFS Smart Bus (2012 prototype)' : (vehicle.model || 'Model unknown');
     updateAmenities(vehicle);
@@ -536,7 +554,7 @@
     smartPanel.hidden = !smart9434;
     $('fleetProfile').classList.toggle('smart-prototype', smart9434);
     const bodyVariant = $('detailNovaBody');
-    const body = vehicle.nova_body_variant || VERIFIED_NOVA_BODY[String(fleetNumber)] || null;
+    const body = state.system==='vancouver' ? null : (vehicle.nova_body_variant || VERIFIED_NOVA_BODY[String(fleetNumber)] || null);
     const nova2009 = isNova2009(vehicle);
     let bodyText = '';
     if (body === 'raised') bodyText = String(fleetNumber) === '9426' ? 'Raised roof · white LEDs' : 'Raised roof';
@@ -581,7 +599,7 @@
     if (chosenArt) {
       const manualArt = variants.find(v => v.id === artChoices[artKey(vehicle)]);
       artSelect.value = vehicle.model_key === 'xn40' && !manualArt ? 'auto' : chosenArt.id;
-      const source = '/buses/' + chosenArt.id + '.png?v=3.4.11';
+      const source = '/buses/' + chosenArt.id + '.png?v=4.0-alpha';
       if (busImage.getAttribute('src') !== source) busImage.src = source;
       busImage.hidden = false;
       busImage.alt = `${vehicle.model || 'Bus'} — vehicle illustration (${chosenArt.name})`;
@@ -854,7 +872,8 @@
   function selectVehicle(id, center) {
     const vehicle = state.vehicles.find((v) => v.id === id);
     if (!vehicle) return;
-    if (state.selected !== id){ resetHistory(); $('shareVehicleStatus').hidden=true; }
+    const newSelection = state.selected !== id;
+    if (newSelection){ if (mobile() && !state.selected) mobileListScroll = $('sidebar').scrollTop; resetHistory(); $('shareVehicleStatus').hidden=true; }
     state.selected = id;
     $('sharedVehicleNotice').hidden=true;
     document.body.classList.add('detail-open');
@@ -879,7 +898,7 @@
     renderMap();
     renderList();
     // Tapping a marker shows a thumb-friendly half-height bottom sheet.
-    if (mobile()) { setSheetMode('half'); setSidebar(true); }
+    if (mobile()) { setSheetMode('half'); setSidebar(true); if(newSelection) $('sidebar').scrollTop=0; if((newSelection || center) && state.map){state.map.invalidateSize({pan:false,animate:false});state.map.setView([vehicle.lat,vehicle.lon],Math.max(state.map.getZoom(),13),{animate:false});} }
 
   }
   function leaveDetails() {
@@ -910,6 +929,7 @@
     renderMap();
     renderList();
     updateMobileOpenLabel();
+    if(mobile()) $('sidebar').scrollTop=mobileListScroll;
   }
   function returnToRouteList() {
     if(state.selected)leaveDetails();
@@ -954,11 +974,11 @@
     const map = state.map;
     const bounds = map.getBounds().pad(0.18);
     const visible = filteredVehicles().filter((v) => bounds.contains([v.lat, v.lon]));
-    if (map.getZoom() > (mobile() && state.lite ? 13 : 11)) return visible.map((v) => ({ key:`bus:${v.id}`, lat:v.lat, lon:v.lon, type:'bus', vehicle:v }));
+    if (map.getZoom() > (state.system==='vancouver' ? (mobile()?14:12) : mobile() && state.lite ? 13 : 11)) return visible.map((v) => ({ key:`bus:${v.id}`, lat:v.lat, lon:v.lon, type:'bus', vehicle:v }));
     // Always keep a selected vehicle individually tappable, even when its neighbors are clustered.
     const focused = visible.find((v) => v.id === state.selected);
     // Render fewer markers when zoomed out; map projection gives stable cell sizes.
-    const size = mobile() && state.lite ? (map.getZoom() < 10 ? 68 : 58) : (map.getZoom() < 10 ? 46 : 38);
+    const size = state.system==='vancouver' ? (mobile()?75:55) : mobile() && state.lite ? (map.getZoom() < 10 ? 68 : 58) : (map.getZoom() < 10 ? 46 : 38);
     const groups = new Map();
     for (const v of visible) {
       if (focused && v.id === focused.id) continue;
@@ -989,18 +1009,18 @@
     return tracker?.sample(now,state.motionEnabled && visualMotion()) || null;
   }
   function selectedMotionPoint(v,now=Date.now()) {
-    if(!state.motionEnabled || !visualMotion())return null;
+    if(state.system==='vancouver'||!state.motionEnabled || !visualMotion())return null;
     return selectedMotionSample(v,now)?.point || null;
   }
   function updateMotionLabel(v) {
     const el=$('motionStatus');if(!el || !v)return;
     const active=selectedMotionSample(v);
-    const estimated = Boolean(active?.reconciling || active?.estimated);
+    const estimated = state.system!=='vancouver' && Boolean(active?.reconciling || active?.estimated);
     el.hidden = !estimated;
     el.textContent = estimated ? `Estimated position · GPS ${timeAgo(v.timestamp)}` : '';
   }
   function updateSelectedMotion() {
-    if (document.visibilityState!=='visible'||!state.map||!state.selected)return;
+    if (state.system==='vancouver'||document.visibilityState!=='visible'||!state.map||!state.selected)return;
     const v=state.vehicles.find(x=>x.id===state.selected);
     if(!v)return;
     const record=state.markers.get(`bus:${v.id}`);
@@ -1044,7 +1064,7 @@
           // The selected marker is interpolated in the shared motion engine.
           // Never overwrite it with raw GPS before the correction has settled.
           const element=record.marker.getElement();
-          if(element && !selected && state.positionRefresh && visualMotion() && !(mobile() && state.lite)) {
+          if(state.system!=='vancouver' && element && !selected && state.positionRefresh && visualMotion() && !(mobile() && state.lite)) {
             element.style.transition='transform .85s ease-out';
             setTimeout(()=>{if(element.isConnected)element.style.transition='';},900);
           }
@@ -1088,7 +1108,7 @@
     const detail = state.routeDetail;
     const status = $('arrivalFeedStatus');
     status.textContent = state.arrivalStatus === 'live'
-      ? 'Live estimates from BC Transit trip updates where provided; other times are scheduled.'
+      ? 'Live estimates from agency trip updates where provided; other times are scheduled.'
       : 'No fresh trip-specific arrival estimates. Times below are scheduled, not live.';
     const list = $('allStopsList');
     const listScroll = list.scrollTop;
@@ -1125,7 +1145,7 @@
           state.map.setView([item.lat, item.lon], Math.max(14, state.map.getZoom()), {animate:false});
           if (marker) marker.openPopup();
         }
-        if (window.innerWidth <= 720) setSidebar(false);
+        if (mobile()) setSidebar(false);
       });
       const wrap=document.createElement('div');wrap.className='stop-list-entry';
       const fav=document.createElement('button');fav.type='button';fav.className='stop-star';
@@ -1324,7 +1344,7 @@
       try {state.closed=localStorage.getItem('bct_desktop_sidebar_closed')==='true';} catch (_) {}
       document.body.classList.toggle('sidebar-hidden',state.closed);
     }
-    if (window.innerWidth <= 720) {
+    if (mobile()) {
       state.closed = true;
       document.body.classList.add('sidebar-hidden');
     }
@@ -1345,12 +1365,12 @@
     map.on('zoomend moveend', () => {renderMap(); saveMapView(); if(boardOpen() && !state.userLocation && !state.boardPointer) scheduleBoardUpdate();});
     let boardHoverAt=0;
     map.on('mousemove',event=>{
-      if(touchScreen()||!state.customization.hoverPreview||!boardOpen()||document.body.classList.contains('detail-open'))return;
+      if(touchScreen()||!state.customization.hoverPreview||!boardOpen()||(state.selected && (!mobile() || !state.closed)))return;
       if(Date.now()-boardHoverAt<180)return;
       boardHoverAt=Date.now();showBoardPoint(event.latlng.lat,event.latlng.lng,'hover');
     });
     map.on('click',event=>{
-      if(!state.customization.tapPreview||!boardOpen()||document.body.classList.contains('detail-open'))return;
+      if(!state.customization.tapPreview||!boardOpen()||(state.selected && (!mobile() || !state.closed)))return;
       showBoardPoint(event.latlng.lat,event.latlng.lng,'tap');
     });
     state.map = map;
@@ -1368,15 +1388,51 @@
     state.historyLayer = L.layerGroup().addTo(map);
   }
   function updateMobileOpenLabel() {
-    $('mobileOpenText').textContent = state.selected ? '← Routes' : 'Routes';
-    $('mobileOpen').setAttribute('aria-label', state.selected ? 'Return to route search and active buses' : 'Open route search and bus list');
+    $('mobileOpenText').textContent = state.selected ? 'Bus details' : 'Routes';
+    $('mobileOpen').setAttribute('aria-label', state.selected ? 'Reopen selected bus details' : 'Open route search and bus list');
+    $('mobileOpen').setAttribute('aria-expanded', String(!state.closed));
   }
   function setSheetMode(mode) {
     state.sheetMode = mode === 'full' ? 'full' : 'half';
     document.body.classList.toggle('sheet-full', state.sheetMode === 'full');
     $('sheetHandle').setAttribute('aria-expanded', String(state.sheetMode === 'full'));
     $('sheetHandle').setAttribute('aria-label', state.sheetMode === 'full' ? 'Reduce bus panel height' : 'Expand bus panel');
-    // The map stays full screen behind the sheet, so only a resize refresh is needed.
+    handleSheetHint();
+    if (mobile()) refreshMapLayout();
+  }
+  function handleSheetHint() {
+    $('sheetHandle').querySelector('.sheet-hint').textContent = state.sheetMode === 'full' ? 'Tap or drag down to reduce' : 'Tap or drag up to expand';
+  }
+  let mobileListScroll = 0;
+  let viewportFrame = 0;
+  function syncMobileViewport() {
+    const vv = window.visualViewport;
+    const root = document.documentElement;
+    const focused = document.activeElement;
+    const editing = focused?.matches('input:not([type=checkbox]):not([type=range]):not([type=color]), textarea, [contenteditable=true]');
+    // Safari can pan the visual viewport when its keyboard opens. Do not
+    // treat pinch zoom or ordinary address-bar changes as a keyboard.
+    if (mobile() && vv && editing && Math.abs(vv.scale-1)<0.02 && Math.max(window.innerHeight, root.clientHeight)-vv.height>100) {
+      root.style.setProperty('--mobile-height', Math.round(vv.height)+'px');
+      root.style.setProperty('--mobile-viewport-top', Math.max(0,Math.round(vv.offsetTop))+'px');
+      document.body.classList.add('mobile-keyboard');
+    } else {
+      root.style.removeProperty('--mobile-height');
+      root.style.removeProperty('--mobile-viewport-top');
+      document.body.classList.remove('mobile-keyboard');
+    }
+    refreshMapLayout();
+  }
+  function queueViewportSync() {
+    if (viewportFrame) return;
+    viewportFrame = requestAnimationFrame(()=>{viewportFrame=0;syncMobileViewport();});
+  }
+  function syncMobileMode() {
+    const onPhone = mobile();
+    $('sidebarClose').querySelector('.sidebar-close-label').textContent = onPhone ? 'Map' : '✕';
+    $('sidebarClose').setAttribute('aria-label', onPhone ? 'Return to map' : 'Hide sidebar');
+    $('sidebar').inert = state.closed;
+    syncMobileViewport();
   }
   // Leaflet must be resized after CSS's 170 ms sidebar transition finishes.
   // A single early invalidateSize leaves grey strips on wider displays.
@@ -1391,7 +1447,10 @@
   function setSidebar(visible) {
     state.closed = !visible;
     if (visible && state.needsListRefresh) renderList();
+    if (visible && state.selected) updateDetails();
     document.body.classList.toggle('sidebar-hidden', state.closed);
+    if (!visible && $('sidebar').contains(document.activeElement)) document.activeElement.blur();
+    syncMobileMode();
     if (!mobile()) try {localStorage.setItem('bct_desktop_sidebar_closed', String(state.closed));} catch (_) {}
     updateMobileOpenLabel();
     if (visible && mobile()) $('nearbyBoard').open=false;
@@ -1472,7 +1531,7 @@
       const data = await response.json();
       if (requestSystem !== state.system || requestGeneration !== state.systemGeneration) return;
       if (data.unchanged) {
-        if (state.data) { state.data.error = data.error; state.data.metadata_error = data.metadata_error; }
+        if (state.data) { state.data.error = data.error; state.data.metadata_error = data.metadata_error; if(data.api_budget){state.data.api_budget=data.api_budget;state.data.poll_seconds=data.poll_seconds;} }
         state.clientError = null; renderStatus(); return;
       }
       if (!Array.isArray(data.vehicles)) throw new Error('Invalid JSON');
@@ -1534,7 +1593,7 @@
   function vehicleShareLink(vehicle) {
     const link = new URL(location.href);link.search='';link.hash='';
     link.searchParams.set('system',state.system);
-    if (/^\d{4}$/.test(String(vehicle.fleet_number||''))) link.searchParams.set('fleet',String(vehicle.fleet_number));
+    if ((state.system==='vancouver'?/^\d{3,5}$/:/^\d{4}$/).test(String(vehicle.fleet_number||''))) link.searchParams.set('fleet',String(vehicle.fleet_number));
     else link.searchParams.set('vehicle',String(vehicle.id));
     return link.href;
   }
@@ -1542,7 +1601,7 @@
     const v=state.vehicles.find(x=>x.id===state.selected);if(!v)return;
     const link=vehicleShareLink(v), status=$('shareVehicleStatus');
     try {
-      if (navigator.share && touchScreen()) await navigator.share({title:'BC Transit Bus Radar · '+(v.fleet_number ? 'Bus #'+v.fleet_number : 'Vehicle'),url:link});
+      if (navigator.share && touchScreen()) await navigator.share({title:'Bus Radar · '+(v.fleet_number ? 'Bus #'+v.fleet_number : 'Vehicle'),url:link});
       else if (navigator.clipboard?.writeText) {await navigator.clipboard.writeText(link);status.textContent='Vehicle link copied.';status.hidden=false;}
       else {window.prompt('Copy this vehicle link',link);status.textContent='Share link ready.';status.hidden=false;}
     } catch(e) {if(e?.name!=='AbortError'){status.textContent='Sharing unavailable. Copy the URL from the browser instead.';status.hidden=false;}}
@@ -1585,7 +1644,7 @@
     const params=new URLSearchParams(location.search),system=params.get('system');
     if(!system || !Object.hasOwn(SYSTEMS,system))return null;
     const fleet=params.get('fleet'), vehicle=params.get('vehicle');
-    if (fleet && /^\d{4}$/.test(fleet)) return {system,fleet,vehicle:null,checked:false};
+    if (fleet && (system==='vancouver'?/^\d{3,5}$/:/^\d{4}$/).test(fleet)) return {system,fleet,vehicle:null,checked:false};
     if (vehicle && vehicle.length<=128) return {system,fleet:null,vehicle,checked:false};
     return null;
   }
@@ -1627,7 +1686,7 @@
   async function loadAlerts(hostId,vehicle=null){
     const system=state.system, current=alertsCache.get(system);
     if(current && Date.now()-current.at<180000){renderAlerts(hostId,vehicle);return;}
-    const host=$(hostId);host.textContent='Checking BC Transit service alerts…';
+    const host=$(hostId);host.textContent='Checking service alerts…';
     try {
       const res=await fetch(apiPath('alerts'),{cache:'no-store'});
       if(!res.ok)throw new Error('HTTP '+res.status);
@@ -1663,7 +1722,7 @@
       const value=JSON.parse(localStorage.getItem(favoriteStorageKey())||'{}');
       state.favorites={routes:Array.isArray(value.routes)?value.routes.filter(v=>typeof v==='string').slice(0,30):[],
         stops:Array.isArray(value.stops)?value.stops.filter(v=>v&&typeof v.id==='string'&&typeof v.name==='string').slice(0,30):[],
-        buses:Array.isArray(value.buses)?value.buses.filter(v=>v&&typeof v.id==='string'&&v.id.length<129&&typeof v.name==='string'&&(!v.fleet||/^\d{4}$/.test(v.fleet))).slice(0,40):[]};
+        buses:Array.isArray(value.buses)?value.buses.filter(v=>v&&typeof v.id==='string'&&v.id.length<129&&typeof v.name==='string'&&(!v.fleet||/^\d{3,5}$/.test(v.fleet))).slice(0,40):[]};
     } catch(_){state.favorites={routes:[],stops:[],buses:[]};}
   }
   function saveFavorites(){
@@ -1729,6 +1788,7 @@
     if(state.locationCircle){state.locationCircle.remove();state.locationCircle=null;}
   }
   function stopLocation(){
+    state.locationRequestSerial++;state.locationRequestPending=false;
     state.userLocation=null;state.pendingNearestSort=false;clearLocationMarker();
     if(boardOpen())refreshNearbyBoard(true);
     $('nearbySection').hidden=true;
@@ -1738,21 +1798,25 @@
     lastListSignature='';renderList();
   }
   function startLocation(){
-    if(state.userLocation){requestLocation();return;}
     if(state.locationRequestPending)return;
+    if(state.userLocation){requestLocation();return;}
     if(!navigator.geolocation){
-      $('nearbySection').hidden=false;$('nearbyHint').textContent='Your browser does not support location access.';return;
+      if(state.selected) leaveDetails();setSidebar(true);$('nearbySection').hidden=false;$('nearbyHint').textContent='Location access is unavailable. Use a secure HTTPS connection and a supported browser.';return;
     }
     if(!$('locationConsent').open){$('locationConsent').showModal();}
   }
   function requestLocation(){
+    if(state.locationRequestPending)return;
+    if(!navigator.geolocation){if(state.selected)leaveDetails();setSidebar(true);$('nearbySection').hidden=false;$('nearbyHint').textContent='Location access is unavailable.';return;}
     state.locationRequestPending=true;
+    const requestSerial=++state.locationRequestSerial;
+    if(state.selected)leaveDetails();setSidebar(true);
     $('nearbySection').hidden=false;
     $('nearbyHint').textContent='Requesting location from your browser…';
     const system=state.system;
     navigator.geolocation.getCurrentPosition(async(pos)=>{
+      if(system!==state.system||requestSerial!==state.locationRequestSerial)return;
       state.locationRequestPending=false;
-      if(system!==state.system)return;
       const {latitude:lat,longitude:lon,accuracy}=pos.coords;
       if(!Number.isFinite(lat)||!Number.isFinite(lon))return;
       state.userLocation={lat,lon,accuracy:Number.isFinite(accuracy)?accuracy:null};
@@ -1767,12 +1831,12 @@
         state.map.setView([lat,lon],Math.max(13,state.map.getZoom()),{animate:false});
       }
       setSidebar(true);renderNearby();if(boardOpen())refreshNearbyBoard(true);lastListSignature='';renderList();
-      try{await loadStopCatalog();if(state.userLocation&&system===state.system)renderNearby();}
-      catch(err){if(system===state.system){$('nearbyHint').textContent='Nearby buses available; stops: '+err.message;renderNearby(true);}}
+      try{await loadStopCatalog();if(state.userLocation&&system===state.system&&requestSerial===state.locationRequestSerial)renderNearby();}
+      catch(err){if(system===state.system&&requestSerial===state.locationRequestSerial){$('nearbyHint').textContent='Nearby buses available; stops: '+err.message;renderNearby(true);}}
     },err=>{
-      if(system!==state.system)return;
+      if(system!==state.system||requestSerial!==state.locationRequestSerial)return;
       state.locationRequestPending=false;state.pendingNearestSort=false;
-      $('nearbyHint').textContent=err?.code===1?'Location permission denied. You can enable it in your browser settings.'
+      $('nearbyHint').textContent=err?.code===1?'Location permission denied. Check your browser or device location settings, then try Near me again.'
         : 'Location unavailable. Check GPS/location settings or try again.';
     },{enableHighAccuracy:false,timeout:10000,maximumAge:30000});
   }
@@ -2137,6 +2201,8 @@
     $('smoothMotionToggle').checked = state.motionEnabled;
     $('sortSelect').value=state.sortBy;
     $('serviceFilter').value=state.serviceFilter;
+    for(const opt of $('modelSelect').options){opt.hidden=opt.value!=='all'&&opt.value!=='generic'&&((state.system==='vancouver')!==opt.value.startsWith('tl_'));}
+    if(!Array.from($('modelSelect').options).some(o=>o.value===state.modelFilter&&!o.hidden))state.modelFilter='all';
     $('modelSelect').value=state.modelFilter;
     if($('v34MarkerSize')) syncSettingsControls();
     lastListSignature = ''; renderList(); renderMap();
@@ -2152,7 +2218,7 @@
     if (!Object.hasOwn(SYSTEMS, value) || value === state.system) return;
     saveMapView();
     if (state.selected) leaveDetails();
-    state.system = value; state.systemGeneration++;
+    state.system = value; state.systemGeneration++; state.modelFilter='all'; $('modelSelect').value='all'; for(const opt of $('modelSelect').options){opt.hidden=opt.value!=='all'&&opt.value!=='generic'&&((value==='vancouver')!==opt.value.startsWith('tl_'));}
     $('sharedVehicleNotice').hidden=true;
     if(state.sharedFocusMarker){state.sharedFocusMarker.remove();state.sharedFocusMarker=null;}
     if(state.pendingShare?.system!==value)state.pendingShare=null;
@@ -2160,9 +2226,10 @@
     state.vehicles=[]; state.data=null; state.clientError=null; state.restoredCache=false;
     state.motionTracks.clear();
     state.expandedGroups.clear(); state.needsListRefresh=false;
+    state.locationRequestSerial++;state.locationRequestPending=false;
     state.userLocation=null;state.pendingNearestSort=false;clearLocationMarker();
     if (state.nearbyStopMarker) {state.nearbyStopMarker.remove();state.nearbyStopMarker=null;}
-    $('nearbySection').hidden=true;$('locateButton').setAttribute('aria-pressed','false');
+    $('nearbySection').hidden=true;$('locateButton').setAttribute('aria-pressed','false');$('locateButton').classList.remove('active');$('locateButton').title='Show my location and nearby buses';
     state.nearbyStopToken++;
     state.boardSerial++;state.boardPending=false;state.boardQueued=false;state.boardPayload=null;state.boardAt=null;state.boardLastFetch=0;
     state.boardPointer=null;state.boardPointerMode=null;state.boardPointerMarker?.remove();state.boardPointerMarker=null;
@@ -2276,13 +2343,13 @@
     $('shareVehicleButton').addEventListener('click',shareSelectedBus);
     $('alertsMainSection').addEventListener('toggle',ev=>{if(ev.target.open)loadAlerts('alertsMainContent');});
     $('alertsDetailSection').addEventListener('toggle',ev=>{if(ev.target.open){const v=state.vehicles.find(v=>v.id===state.selected);if(v)loadAlerts('alertsDetailContent',v);}});
-    $('nearbyBoard').addEventListener('toggle',()=>{if(boardOpen()){if(mobile())setSidebar(false);refreshNearbyBoard(true);}else{state.boardPointerMarker?.remove();state.boardPointerMarker=null;state.boardPointer=null;state.boardPointerMode=null;}});
+    $('nearbyBoard').addEventListener('toggle',()=>{$('mobileDepartures').setAttribute('aria-expanded',String(boardOpen()));if(boardOpen()){if(mobile())setSidebar(false);refreshNearbyBoard(true);}else{state.boardPointerMarker?.remove();state.boardPointerMarker=null;state.boardPointer=null;state.boardPointerMode=null;}});
     $('boardRefresh').addEventListener('click',()=>refreshNearbyBoard(true));
     $('boardLocate').addEventListener('click',clearBoardPoint);
     // On Android, swipe the nearby sheet handle upward/downward to open/close.
     // Preserve the standard summary tap and keyboard behaviour.
     const boardHandle=$('nearbyBoard').querySelector('summary');
-    let boardTouchStart=null, suppressBoardClick=false;
+    let boardTouchStart=null;
     boardHandle.addEventListener('touchstart',event=>{
       boardTouchStart=event.touches.length===1?event.touches[0].clientY:null;
     },{passive:true});
@@ -2290,12 +2357,10 @@
       if(boardTouchStart===null)return;
       const delta=event.changedTouches[0].clientY-boardTouchStart;boardTouchStart=null;
       if(Math.abs(delta)<35)return;
-      event.preventDefault();suppressBoardClick=true;
+      event.preventDefault();
       $('nearbyBoard').open=delta<0;
     },{passive:false});
-    boardHandle.addEventListener('click',event=>{
-      if(suppressBoardClick){event.preventDefault();suppressBoardClick=false;}
-    });
+    boardHandle.addEventListener('touchcancel',()=>{boardTouchStart=null;});
 
     $('locateButton').addEventListener('click',startLocation);
     $('locationStop').addEventListener('click',stopLocation);
@@ -2335,23 +2400,39 @@
     $('followButton').addEventListener('click', () => {state.following = !state.following;updateDetails();});
     $('themeToggle').addEventListener('click', () => setTheme(state.theme === 'classic' ? 'dark' : 'classic'));
     $('liteToggle').addEventListener('click', () => setLite(!state.lite));
-    $('mobileOpen').addEventListener('click', () => {if(state.selected) leaveDetails();setSheetMode('half'); setSidebar(true);});
-    let dragStart = null;
+    $('mobileOpen').addEventListener('click', () => {setSheetMode('half'); setSidebar(true);});
+    $('mobileDepartures').addEventListener('click', () => {$('nearbyBoard').open=!$('nearbyBoard').open;});
+    $('mobileReset').addEventListener('click', () => { $('resetView').click(); $('v34Settings').close(); });
+    $('routeSearch').addEventListener('focus', () => {if(mobile()) setSheetMode('full');});
+    $('routeSearch').addEventListener('keydown', e => {if(mobile() && e.key==='Enter') $('routeSearch').blur();});
+    window.visualViewport?.addEventListener('resize', queueViewportSync);
+    window.visualViewport?.addEventListener('scroll', queueViewportSync);
+    window.addEventListener('resize', queueViewportSync, {passive:true});
+    document.addEventListener('focusin',queueViewportSync);
+    document.addEventListener('focusout',queueViewportSync);
+    window.matchMedia('(max-width:720px), (max-width:1100px) and (max-height:550px) and (any-pointer:coarse), (min-width:721px) and (max-width:1100px) and (orientation:portrait) and (any-pointer:coarse)').addEventListener('change', () => {syncMobileMode();refreshMapLayout();});
+    let dragStart = null, suppressHandleClick = false;
     const handle = $('sheetHandle');
-    handle.addEventListener('pointerdown', (event) => {
-      dragStart = {y:event.clientY, time:Date.now()};
-      if (handle.setPointerCapture) handle.setPointerCapture(event.pointerId);
+    handle.addEventListener('pointerdown', event => {
+      if (!event.isPrimary || event.button !== 0) return;
+      dragStart = {y:event.clientY,id:event.pointerId}; suppressHandleClick=false;
+      try { handle.setPointerCapture?.(event.pointerId); } catch (_) { /* Safari may have already cancelled the pointer. */ }
     });
-    handle.addEventListener('pointerup', (event) => {
-      if (!dragStart) return;
-      const delta = event.clientY - dragStart.y;
-      dragStart = null;
-      if (delta < -35) setSheetMode('full');
-      else if (delta > 70) setSidebar(false);
-      else if (delta > 35) setSheetMode('half');
-      else setSheetMode(state.sheetMode === 'full' ? 'half' : 'full');
+    handle.addEventListener('pointerup', event => {
+      if (!dragStart || dragStart.id!==event.pointerId) return;
+      const delta = event.clientY - dragStart.y; dragStart=null;
+      if (Math.abs(delta)<35) return; // Native click handles taps and keyboard.
+      suppressHandleClick=true;
+      if (delta<0) setSheetMode('full');
+      else if (state.sheetMode==='full') setSheetMode('half');
+      else setSidebar(false);
     });
-    handle.addEventListener('pointercancel', () => {dragStart = null;});
+    handle.addEventListener('click', event => {
+      if(suppressHandleClick && event.detail!==0){suppressHandleClick=false;return;}
+      suppressHandleClick=false;setSheetMode(state.sheetMode==='full'?'half':'full');
+    });
+    handle.addEventListener('pointercancel', () => {dragStart=null;suppressHandleClick=false;});
+    handle.addEventListener('lostpointercapture', () => {dragStart=null;});
     $('resetView').addEventListener('click', () => state.map?.setView([currentView().lat,currentView().lon],currentView().zoom,{animate:false}));
     $('menuToggle').addEventListener('click', () => {if(state.selected) returnToRouteList();else setSidebar(state.closed);});
     $('sidebarClose').addEventListener('click', () => setSidebar(false));
@@ -2412,17 +2493,17 @@
     setLite(state.lite, false);
     applyCustomization(false);
     readFavorites(); renderFavorites();
-    renderQuickRoutes(); bindControls(); bindSettings(); initMap(); setFilter(state.query); applyPreferences(); updateMobileOpenLabel();
+    renderQuickRoutes(); bindControls(); bindSettings(); initMap(); syncMobileMode(); handleSheetHint(); setFilter(state.query); applyPreferences(); updateMobileOpenLabel();
     try {
       const cached = JSON.parse(sessionStorage.getItem(snapshotKey()) || 'null');
       if (cached && Date.now()-cached.savedAt < 120000 && cached.data) applyData(cached.data,true);
     } catch (_) {}
-    loadVehicles();
+    state.lastClientPollAt=Date.now();loadVehicles();
     // On slower phones, avoid repeatedly checking the same server cache.
     // This doesn't slow BC Transit's actual upstream feed or initial page load.
     setInterval(() => {
       if (document.visibilityState !== 'visible') return;
-      const interval = state.lowBandwidth ? 25000 : mobile() ? 10000 : CLIENT_REFRESH_MS;
+      const interval = state.system==='vancouver' ? (state.lowBandwidth?20000:10000) : state.lowBandwidth ? 25000 : mobile() ? 10000 : CLIENT_REFRESH_MS;
       if (Date.now()-state.lastClientPollAt >= interval) {
         state.lastClientPollAt = Date.now();loadVehicles();
       }
@@ -2433,9 +2514,24 @@
     // 10 frames/sec is enough for a one-marker glide and is cheap on Android.
     setInterval(updateSelectedMotion, 100);
     setInterval(() => { if (document.visibilityState === 'visible' && state.selected && (!state.lowBandwidth || Date.now()-state.lastArrivalRefreshAt>=60000)) refreshSelectedArrivals(); }, 20000);
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') { loadVehicles(); if (state.selected) refreshSelectedArrivals(); }
-    });
+    // iOS suspends timers while in the background and may restore from its
+    // back/forward cache. Refresh immediately on resume/reconnect, but coalesce
+    // visibility/pageshow events. Never start location tracking here.
+    let lastResumeAt=0;
+    function resumeLiveView(force=false) {
+      if(document.visibilityState!=='visible')return;
+      queueViewportSync();renderStatus();
+      const now=Date.now();
+      if(!force && now-lastResumeAt<1500)return;
+      lastResumeAt=now;state.lastClientPollAt=now;
+      loadVehicles();
+      if(state.selected)refreshSelectedArrivals();
+      if(boardOpen())refreshNearbyBoard(true);
+    }
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')resumeLiveView();});
+    window.addEventListener('pageshow',event=>{if(event.persisted)resumeLiveView();});
+    window.addEventListener('online',()=>resumeLiveView(true));
+    window.addEventListener('offline',renderStatus);
   }
   init();
 })();

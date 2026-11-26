@@ -6,4 +6,4 @@
 body.detail-open.sidebar-hidden .mobile-open{min-width:124px}
 /* Preserve enough top-bar space for narrow landscape viewports. */
 @media(min-width:721px) and (max-width:980px){.v342-return-routes{min-width:78px;padding:0 7px;font-size:11px}}
-@media(max-width:720px){.detail-section .back-button{top:-19px;min-height:48px;font-size:15px}.v342-return-routes{display:none!important}}
+@media (max-width:720px), (max-width:1100px) and (max-height:550px) and (any-pointer:coarse), (min-width:721px) and (max-width:1100px) and (orientation:portrait) and (any-pointer:coarse){.detail-section .back-button{top:-19px;min-height:48px;font-size:15px}.v342-return-routes{display:none!important}}

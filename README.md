@@ -1,4 +1,37 @@
-# BC Transit Bus Radar V3.4.11 — Cowichan Valley + Kelowna Gen 4 art reference
+# Bus Radar V4.0 Alpha — Metro Vancouver
+
+## Railway setup (one replica)
+
+1. Extract this archive directly into your existing repository root, preserving the existing Railway volume and variables. Commit and deploy.
+2. In Railway → your Bus Radar service → Variables, set `TRANSLINK_API_KEY` to your TransLink developer key exactly as issued. Never commit the key or put it in browser JavaScript. Rotate the key if it has been exposed. No key is included in this archive.
+3. Use an existing persistent Railway volume mounted at `/data` (or your existing mount path). Set `TRANSLINK_BUDGET_DB=/data/translink-budget.sqlite3` (adjust mount path). If `BCT_HISTORY_DB` points to an existing persistent directory, the budget defaults to the same directory; the existing history DB itself is not changed. Railway deployment with no configured persistent storage fails closed for TransLink. Do not delete the budget database or run multiple replicas with independent budgets. Local development defaults to `cache/translink-budget.sqlite3`.
+4. Leave `TRANSLINK_DAILY_BUDGET` unset (default 950 attempts per rolling 24h) unless TransLink has explicitly approved a different allowance. `TRANSLINK_GPS_SECONDS` defaults to 20, minimum 15. Set a higher value if conserving quota. Deploy/restart after changing variables.
+5. Select Metro Vancouver (Alpha). The browser initially checks the shared cache every 10 seconds (20 seconds in data saver mode). Expect an asynchronous first feed fetch and separate static metadata loading. Health checks do not start Vancouver polling. See `/api/health?system=vancouver` for status and quota (no key exposed).
+
+## Quota and accuracy
+
+- One shared authenticated worker, idle unless a Vancouver vehicle snapshot was requested in the last 35 seconds. All active browsers share the same upstream feed; browser refreshes don't directly invoke TransLink. Idle grace may consume a final request.
+- 950 attempts per rolling 24 hours including failed requests; allocated caps: 760 GPS, 142 trip updates, 47 alerts (949 total by rounding). 51 requests are left outside these caps as a margin against the published 1,000. Other applications using the same key are NOT accounted for. Use a dedicated key. Budget reservations are SQLite-transactional and survive restarts on a persistent volume; if the DB fails the worker pauses rather than issuing unmetered requests. Daily budget increases require agency approval.
+- GPS starts at ~20s while viewed; slows to at least 40s after 50% of GPS cap and 90s after 80%. Trip updates start at 120s and slow with GPS; alerts every 600s. All intervals are minimums, not a guaranteed refresh rate. 401/403 and 429 trigger shared backoff. Quota exhaustion leaves cached positions with an explicit status; there is no fabricated GPS. History is recorded only while tracking is active, and only for vehicle-provided timestamps in Vancouver.
+- No authenticated requests when the key is missing. Static schedules are a separate public ZIP, fetched on demand then at most daily on success. A cached local index is loaded lazily. Vancouver uses bus/trolley routes, a near-term schedule service window, only referenced shapes, per-stop timetable caches, shared enriched snapshots, unchanged revisions, compressed HTTP responses, viewport culling and larger low-zoom clusters. All route groups are visible even for >300 buses; ungrouped list has a 300-row cap and search can narrow it. Vancouver off-route/NIS inference and route-aligned bearing are deferred pending scale/accuracy testing; raw bearings are used. Selected-marker extrapolation is disabled for Vancouver. BC Transit systems retain their previous rates and behavior.
+- Vancouver fleet numbers/model labels are preliminary candidate matches, not verified live assignments. Unknown numeric display labels can be shown with unknown model. Every Vancouver bus uses PLACEHOLDER / N/A; existing BC Transit drawings are preserved. No simulated train or ferry locations. If the feed includes non-bus records, known non-bus routes are excluded once static metadata is available.
+- Official API: https://www.translink.ca/about-us/doing-business-with-translink/app-developer-resources/gtfs/gtfs-realtime ; static schedules: https://www.translink.ca/about-us/doing-business-with-translink/app-developer-resources/gtfs/gtfs-data ; terms: https://developer.translink.ca/TermsOfUse/WebApi . Required attribution is displayed in the Vancouver map/sidebar.
+
+**Alpha validation limits:** no network DNS access to TransLink in the build environment, so the supplied key, exact raw live descriptor format, live GPS cadence, static archive size and Railway RAM usage have not been verified. The GTFS protobuf dependency could not be installed locally; deployment installs it via requirements.txt. Offline budget/fleet tests and simulated integration checks do not establish live feed compatibility. First deploy is intended for testing, not production-grade service. Do not use the same key on another app during quota testing.
+
+---
+
+# V3.4.13 — iOS & iPadOS compatibility
+
+This update builds on V3.4.12. No Apple developer account, native app, or additional hosting is required. Recommended target: iOS/iPadOS 16.4 or later; use a current Safari release. Apple touch devices get Home Screen installation help, including desktop-style iPad user agents; portrait touch tablets use the bottom sheet, wide landscape tablets use the split view. Keyboard/viewport changes and safe-area offsets are handled without disabling pinch zoom. Resume, back/forward restore and reconnection refresh the live map, selected arrivals and open departures panel. GPS consent remains opt-in; stale location callbacks are rejected after switching systems or hiding location. Offline shell caching does not cache API data or map tiles.
+
+Install: open the HTTPS Railway URL in Safari, use Settings → Home Screen → Install Bus Radar for instructions, then Safari Share (or More) → Add to Home Screen → enable Open as Web App if offered → Add. See https://support.apple.com/en-ca/guide/ipad/ipad8f1f7a29/ipados .
+
+Testing: see tests/mobile_browser_check.py and tests/test_apple_v3413.cjs. Physical iPhone/iPad testing is still required for Safari keyboard, permissions, safe-area and Home Screen behavior. Browser smoke tests use Chromium with Apple user-agent/touch profiles and mocked feed data, not WebKit or real GPS. Push notifications and background tracking are not implemented.
+
+---
+
+# BC Transit Bus Radar V3.4.12 — Cowichan Valley + Kelowna Gen 4 art reference
 
 Built on V3.4.9. Original fleet sheet artwork and its cropped illustrations remain unchanged; the uploaded regional and LFSe PNGs are included.
 
@@ -21,7 +54,7 @@ Built on V3.4.9. Original fleet sheet artwork and its cropped illustrations rema
 - Only fleet numbers consistent with bounded GTFS feed label formats and model
   cohorts are presented as **candidates**, not independently verified fleet IDs.
   Production family is not evidence that a particular unit is currently based
-  in Cowichan. On a mobile home-screen/PWA deployment, cache is bumped to 3.4.11.
+  in Cowichan. On a mobile home-screen/PWA deployment, cache is bumped to 3.4.12.
 - Back-end feed endpoints were confirmed from Mobility Database (operator 10).
   Automated tests cover Cowichan fleet mapping, feeds, cross-region history,
   and the Kelowna-only image override. Live feed behavior on Railway still
@@ -288,7 +321,7 @@ engine; the only new build assets are `web/motion.js` and `web/v34.css`.
 - Stronger sticky `Routes & buses` navigation in profiles, with a desktop map shortcut and mobile route-return button.
 - Frontend and PWA versions updated to 3.4.2.
 
-## V3.4.11 asset update
+## V3.4.12 asset update
 
 - Added project-owner supplied transparent PNG art for the 35-foot Vicinity, old HandyDART/cutaway, and new HandyDART/cutaway.
 - Central Fraser Valley Vicinity 30′ CNG now uses the existing Vicinity 30′ reference image.
@@ -296,27 +329,35 @@ engine; the only new build assets are `web/motion.js` and `web/v34.css`.
 - Kelowna Gen 4 Nova buses still use the Gen 3 drawing as a model reference.
 - Existing gallery PNGs with opaque white backgrounds were cleaned to transparent for consistent display.
 
-## V3.4.11 LFSe artwork refresh
+## V3.4.12 LFSe artwork refresh
 
 - Replaced `nova_lfse.png` with the newly supplied LFSe drawing.
 - Removed the connected exterior white background from the new LFSe image for gallery/detail consistency.
 - Gallery now reflects the new LFSe art automatically via the updated asset file and cache version bump.
 
-## V3.4.11 — gallery refresh and cache fix
+## V3.4.12 — gallery refresh and cache fix
 
 - Rebuilt the vehicle gallery with all new supplied PNGs present, a cleaner responsive layout, and one remaining Gen 4 placeholder.
-- Fixed gallery link to request `/fleet-gallery.html?v=3.4.11`.
+- Fixed gallery link to request `/fleet-gallery.html?v=3.4.12`.
 - Set gallery HTML to revalidate instead of retaining stale 24-hour cache; versioned all gallery PNGs and detail view bus image requests.
 - The full project is packaged at ZIP root for deployment (no extra `busradar_...` parent folder).
 
-## V3.4.11 — Compact gallery
+## V3.4.12 — Compact gallery
 
 - Reworked fleet-gallery.html to visually match Bus Radar's classic-dark app styling: neutral grey, slim borders, compact typography, and small artwork cards.
 - Shows each of the 15 distinct supplied vehicle drawings once, rather than repeating images in reference-art sections.
 - Moved the requested CFV/Yaxing/regional Gen 4 substitutions and remaining missing-art information to one collapsed details section.
 - No changes to fleet detection, live tracking, image bytes, or model-to-art mapping.
-- Gallery and app cache versions bumped to 3.4.11.
+- Gallery and app cache versions bumped to 3.4.12.
 
-### V3.4.11 regional Gen 4 art revision (display version unchanged)
+### V3.4.12 regional Gen 4 art revision (display version unchanged)
 
 Chilliwack/FVX and Cowichan identified NovaBus LFS Gen 4 buses now select `nova3.png`, matching Kelowna's existing fallback. Fleet model/generation identification and the gallery's compact layout are unchanged. A separate internal cache revision ensures the same-version PWA refreshes the updated logic.
+
+## V3.4.12 — Mobile UI overhaul
+- Map-first startup; mobile navigation for Routes / Bus details, Departures and Near me.
+- The Leaflet container uses the remaining screen height above the bus panel instead of extending underneath it. Selecting a bus recentres it in the visible map.
+- One vertical scrolling surface for the route list and vehicle details, with a persistent sheet handle and Map button. Tap or swipe the handle to expand/reduce; swipe down from the reduced panel to close.
+- Search expands the panel, avoids duplicate clear controls, and adapts to the visual viewport when the keyboard opens. A selected bus remains selected when returning to the map; reopen using Bus details.
+- Mobile settings remain accessible at the top, including a reset-map button. Light/dark styles, fleet illustrations and regional fleet mappings are preserved. Phone landscape is covered through a coarse-pointer breakpoint.
+- Offline browser smoke test: `python tests/mobile_browser_check.py` (optional Playwright dependency). Tests use synthetic vehicle responses and no external map service; real device, GPS permissions, actual GTFS and Railway deployment require live validation.

@@ -37,7 +37,7 @@ html[data-marker-size="small"] .bus-marker.v2-marker{font-size:10px!important;he
 html[data-marker-size="large"] .bus-marker.v2-marker{font-size:15px!important;height:34px!important;min-width:38px!important;padding:0 8px!important}
 html[data-route-colors="false"] .bus-marker.v2-marker:not(.possible-offroute){border-left-color:#8b8b8b!important}
 html[data-route-colors="false"] .group-badge,html[data-route-colors="false"] .bus-route{border-left-color:#8b8b8b!important}
-@media(max-width:720px){
+@media (max-width:720px), (max-width:1100px) and (max-height:550px) and (any-pointer:coarse), (min-width:721px) and (max-width:1100px) and (orientation:portrait) and (any-pointer:coarse){
   .system-select{max-width:147px;min-width:0;min-height:46px;font-size:12px;box-shadow:0 1px 3px #0003;padding:0 4px}
   .preferences-section summary{min-height:43px;padding:12px}
   .preferences-body select{min-height:43px;font-size:14px}

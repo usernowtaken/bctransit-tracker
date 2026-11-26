@@ -10,7 +10,7 @@ html[data-theme="dark"] .fleet-profile{background:#292b2e;border-color:#585d61;c
 html[data-theme="dark"] .fleet-profile-text>.fleet-confidence{font-size:10px;font-weight:700;color:#88620b}
 .fleet-profile-text>small{color:#aeb3b7}
 #modelSelect{max-width:100%}
-@media (max-width:720px){.fleet-profile{min-height:92px;padding:12px 9px;gap:5px}.fleet-profile img{width:min(47%,150px)}.fleet-profile-text>strong{font-size:16px}}
+@media (max-width:720px), (max-width:1100px) and (max-height:550px) and (any-pointer:coarse), (min-width:721px) and (max-width:1100px) and (orientation:portrait) and (any-pointer:coarse){.fleet-profile{min-height:92px;padding:12px 9px;gap:5px}.fleet-profile img{width:min(47%,150px)}.fleet-profile-text>strong{font-size:16px}}
 @media (max-width:360px){.fleet-profile img{width:42%}.fleet-profile-text>strong{font-size:15px}.fleet-profile-text>.fleet-confidence{font-size:10px;font-weight:700;color:#88620b}
 .fleet-profile-text>small{font-size:9px}}
 
@@ -24,7 +24,7 @@ html[data-theme="dark"] .fleet-profile-text>.fleet-confidence{font-size:10px;fon
 .artwork-picker select{display:block;width:100%;margin-top:3px;min-height:33px;font-size:11px;border:1px solid #aaa;background:#fff;color:#222;border-radius:2px}
 html[data-theme="dark"] .artwork-picker{color:#c1c6cc}
 html[data-theme="dark"] .artwork-picker select{color:#eee;background:#34383c;border-color:#61666c}
-@media(max-width:720px){.fleet-art{width:min(45%,160px)}.artwork-picker select{min-height:44px}}
+@media (max-width:720px), (max-width:1100px) and (max-height:550px) and (any-pointer:coarse), (min-width:721px) and (max-width:1100px) and (orientation:portrait) and (any-pointer:coarse){.fleet-art{width:min(45%,160px)}.artwork-picker select{min-height:44px}}
 @media(max-width:360px){.fleet-art{width:42%}}
 
 .fleet-profile .fleet-art[hidden]{display:none}
@@ -34,7 +34,7 @@ html[data-theme="dark"] .artwork-picker select{color:#eee;background:#34383c;bor
 .nova-roof-panel label{display:block;font-size:12px;margin:8px 0 0}
 .nova-roof-panel select{display:block;width:100%;min-height:36px;margin-top:5px;border:1px solid #aaa;background:#fff;color:#222;font:12px Arial,sans-serif}
 html[data-theme='dark'] .nova-roof-panel select{background:#303339;color:#eee;border-color:#777}
-@media(max-width:720px){.nova-roof-panel select{min-height:44px}}
+@media (max-width:720px), (max-width:1100px) and (max-height:550px) and (any-pointer:coarse), (min-width:721px) and (max-width:1100px) and (orientation:portrait) and (any-pointer:coarse){.nova-roof-panel select{min-height:44px}}
 
 /* NovaBus V3.0.4 fleet-by-fleet appearance refinements. No bus artwork changes. */
 .fleet-profile .fleet-profile-text>span.nova-body-note{font:normal 11px/1.4 Arial,sans-serif;display:block;margin-top:5px;font:11px/1.4 Arial,sans-serif;color:var(--muted,#64748b)}
@@ -43,4 +43,4 @@ html[data-theme='dark'] .nova-roof-panel select{background:#303339;color:#eee;bo
 .nova-smart-highlight strong{font:700 12px/1.35 Arial,sans-serif;letter-spacing:.03em}
 .nova-smart-highlight span{font:12px/1.4 Arial,sans-serif}
 .fleet-profile.smart-prototype{border-left:4px solid #72a84b}
-@media(max-width:720px){.nova-smart-highlight{margin:10px 0;padding:12px}}
+@media (max-width:720px), (max-width:1100px) and (max-height:550px) and (any-pointer:coarse), (min-width:721px) and (max-width:1100px) and (orientation:portrait) and (any-pointer:coarse){.nova-smart-highlight{margin:10px 0;padding:12px}}

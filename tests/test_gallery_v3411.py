@@ -1,4 +1,4 @@
-"""V3.4.11: gallery is compact; each distinct supplied image appears once."""
+"""V4.0 Alpha: gallery is compact; each distinct supplied image appears once."""
 import unittest
 from pathlib import Path
 from html.parser import HTMLParser
@@ -17,7 +17,7 @@ class Gallery(unittest.TestCase):
         source=(ROOT/'web/fleet-gallery.html').read_text()
         c=Collector();c.feed(source)
         self.assertEqual(c.cards,15)
-        self.assertEqual(c.images,[f'/buses/{name}.png?v=3.4.11' for name in NAMES])
+        self.assertEqual(c.images,[f'/buses/{name}.png?v=4.0-alpha' for name in NAMES])
         self.assertEqual(c.details,1)
     def test_simple_dark_theme_and_placeholder(self):
         src=(ROOT/'web/fleet-gallery.html').read_text()

@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "BC Transit Bus Radar",
+  "name": "Bus Radar",
   "short_name": "Bus Radar",
-  "description": "Fast live bus map for Greater Victoria, Chilliwack and Kelowna using BC Transit public data.",
+  "description": "Independent live bus map for BC Transit regions and Metro Vancouver (alpha).",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",

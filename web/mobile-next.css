@@ -1,0 +1,69 @@
+/* V3.4.13: mobile-only map workspace. Desktop styles remain unchanged. */
+.mobile-actions{display:contents}
+.mobile-departures,.mobile-reset{display:none}
+@media (max-width:720px), (max-width:1100px) and (max-height:550px) and (any-pointer:coarse), (min-width:721px) and (max-width:1100px) and (orientation:portrait) and (any-pointer:coarse){
+ :root{--mobile-height:100dvh;--mobile-safe-bottom:env(safe-area-inset-bottom,0px);--mobile-safe-top:env(safe-area-inset-top,0px);--mobile-sheet:clamp(0px,58%,calc(100% - 82px))}
+ .app-shell{height:var(--mobile-height);position:fixed;inset:0 0 auto;overflow:hidden;width:100%;display:block}
+ body.detail-open{--mobile-sheet:clamp(0px,55%,calc(100% - 82px))}
+ body.sheet-full{--mobile-sheet:calc(100% - 60px)}
+ body.sidebar-hidden{--mobile-sheet:0px}
+ .app-shell .map-main{width:100%;height:calc(100% - var(--mobile-sheet));position:relative;overflow:hidden;min-height:0}
+ .app-shell .sidebar{position:absolute;inset:auto 0 0;width:100%;height:var(--mobile-sheet)!important;min-height:0!important;max-height:100%;margin:0!important;display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scroll-padding-top:92px;scrollbar-width:thin;padding:0 max(0px,env(safe-area-inset-right)) calc(12px + var(--mobile-safe-bottom)) max(0px,env(safe-area-inset-left));border-radius:12px 12px 0 0!important;box-shadow:0 -3px 14px #0003;transition:none!important;will-change:auto;z-index:950;background:var(--panel)}
+ body.sidebar-hidden .app-shell .sidebar{visibility:hidden;pointer-events:none;opacity:0;height:0!important;padding:0;overflow:hidden}
+ .sidebar>*{flex:none!important;min-width:0;max-width:100%}
+ .sidebar>.mobile-sheet-handle{position:sticky;top:0;z-index:12;min-height:32px;height:32px;background:var(--panel);border-bottom:0;padding:4px;gap:2px}
+ .sheet-grip{width:38px;height:4px}.sheet-hint{font-size:10px}
+ .sidebar>.brand-wrap{position:sticky;top:32px;z-index:11;background:var(--panel);padding:0 12px 7px!important}
+ .sidebar .brand-row{gap:9px}.sidebar .brand-icon{width:32px;height:32px}.sidebar .brand-text h1{font-size:16px}
+ .sidebar .sidebar-close{width:auto;min-width:64px!important;min-height:44px!important;font-size:12px;font-weight:700;padding:0 10px;border-radius:5px}
+ .sidebar .search-section{padding:9px 12px 8px!important}.search-section .key-hint{display:none}.search-wrap{margin-top:5px!important}.quick-routes{margin-top:7px!important}
+ .sidebar>.preferences-section{order:5}.sidebar>.fleet-section{order:6;min-height:0;flex:none!important}
+ .sidebar .bus-list,.sidebar .detail-section,.sidebar .nearby-section,.sidebar .favorites-section{max-height:none!important;overflow:visible!important;flex:none!important;height:auto!important;min-height:0}
+ .sidebar .bus-list{padding:0 10px 8px}.sidebar .section-heading{padding:10px 12px 7px}.sidebar .sidebar-footer{display:block;font-size:10px;padding:9px 12px!important}
+ .sidebar .detail-section{padding:9px 12px 16px!important}.detail-section .back-button{position:static;min-height:44px;margin:0 0 9px;box-shadow:none}
+ .detail-section .detail-identity{float:left;margin:0 9px 7px 0}.detail-section .route-tile{height:42px;min-width:50px}.detail-section .detail-destination{min-height:42px;display:flex;align-items:center;margin:0 0 8px;overflow-wrap:anywhere}.detail-section .fleet-profile{clear:both;min-height:80px}
+ .detail-section .v343-all-stops>.all-stops-list,.detail-section .activity-events{max-height:none!important;overflow:visible!important}
+ .detail-section .v343-quick-actions button,.detail-section .v343-secondary-actions button,.detail-section summary,.sidebar .mini-button,.sidebar .route-group-heading,.sidebar .direction-group-heading{min-height:44px!important}
+ html[data-density="compact"] .sidebar .bus-item{min-height:48px!important}
+ .sidebar select,.sidebar input[type=search],.v34-settings select{font-size:16px!important;max-width:100%;min-width:0}
+ .sidebar .list-toolbar-v28{grid-template-columns: minmax(48px,auto) minmax(0,1fr)!important;gap:7px!important}.sidebar .list-toolbar-v28 select{width:100%}.sidebar .list-toolbar-v28 .mini-button{width:100%}
+ .sidebar .preferences-body{min-width:0}.sidebar .preferences-body select{width:100%}
+ /* Top row uses available width; full status text is retained, not a mystery dot. */
+ .map-main .top-bar{top:calc(7px + var(--mobile-safe-top))!important;left:max(8px,env(safe-area-inset-left))!important;right:max(8px,env(safe-area-inset-right))!important;gap:6px!important;align-items:center}
+ .map-main .top-left{flex:1;min-width:0;gap:0!important}.map-main .top-right{flex:none;gap:6px!important;margin:0!important}
+ .map-main .system-select-wrap,.map-main .system-select{max-width:none!important;width:100%;min-width:0}.map-main .system-select{font-size:13px;min-height:44px;padding:0 7px;border-radius:6px}
+ .map-main #menuToggle,.map-main #returnToRoutes,.map-main #themeToggle,.map-main #resetView,.map-main #liteToggle,.map-main .mobile-brand,.map-main .freshness{display:none!important}
+ .map-main .top-button{min-width:44px!important;min-height:44px!important;border-radius:6px!important}
+ .map-main #installButton:not([hidden]){display:flex!important}
+ .map-main .status-pill{width:auto;min-width:0!important;min-height:44px;height:44px!important;max-width:103px;padding:0 8px!important;gap:5px;font-size:10px!important;border-radius:6px!important;white-space:nowrap;letter-spacing:0}
+ .map-main #statusText{display:block;overflow:hidden;text-overflow:ellipsis;max-width:76px}
+ .map-main .status-dot{flex:none}
+ .mobile-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;position:absolute;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));bottom:calc(16px + var(--mobile-safe-bottom));padding:4px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 2px 8px #0003;z-index:850}
+ .map-main .mobile-actions button{position:static!important;display:flex!important;justify-content:center;align-items:center;gap:5px;min-width:0!important;min-height:48px!important;width:100%;padding:4px!important;margin:0!important;border:0!important;border-radius:6px!important;color:var(--text);background:transparent;box-shadow:none!important;font:700 12px/1.2 Arial,sans-serif;white-space:normal;touch-action:manipulation}
+ .map-main .mobile-actions button:first-child,.map-main .mobile-actions button[aria-expanded=true]{background:var(--accent-dim);color:var(--text)}
+ body:not(.sidebar-hidden) .mobile-actions{display:none!important}
+ .map-main .v33-board{left:8px!important;right:8px!important;width:auto!important;bottom:calc(78px + var(--mobile-safe-bottom))!important;max-height:calc(100% - 140px)!important;border-radius:10px;z-index:820}
+ .map-main .v33-board:not([open]){display:none!important}
+ .map-main .v33-board[open]{height:min(64dvh,490px,calc(100% - 140px))!important;max-height:calc(100% - 140px)!important}
+ .map-main .v33-board .v32-board-body{min-height:0;max-height:calc(100% - 51px)!important}
+ .map-main .leaflet-control-zoom{margin-right:10px!important;margin-bottom:calc(72px + var(--mobile-safe-bottom))!important}
+ body:not(.sidebar-hidden) .map-main .leaflet-control-zoom{margin-bottom:10px!important}
+ body.sheet-full:not(.sidebar-hidden) .map-main .leaflet-control-zoom,body.sheet-full:not(.sidebar-hidden) .map-main .leaflet-control-attribution{display:none!important}
+ .map-main .leaflet-control-attribution{max-width:100%;white-space:normal;font-size:9px!important}
+ body:not(.sidebar-hidden) .v33-next-legend{bottom:14px;left:8px;right:auto;max-width:150px}
+ body.sheet-full:not(.sidebar-hidden) .v33-next-legend{display:none}
+ .v34-settings{max-height:calc(var(--mobile-height) - 16px - var(--mobile-safe-top) - var(--mobile-safe-bottom))!important}
+ .v34-settings-scroll{max-height:calc(var(--mobile-height) - 108px - var(--mobile-safe-top) - var(--mobile-safe-bottom))!important}
+ .mobile-reset{display:block;min-height:44px;width:100%;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:5px;margin-top:8px;font-weight:700}
+ body.mobile-keyboard .sidebar{scroll-padding-top:34px}body.mobile-keyboard .sidebar>.brand-wrap{position:static}body.mobile-keyboard .sidebar>.mobile-sheet-handle{position:static}
+}
+@media (max-width:1100px) and (max-height:550px) and (any-pointer:coarse){body:not(.sheet-full){--mobile-sheet:clamp(0px,62%,calc(100% - 82px))}body.sidebar-hidden{--mobile-sheet:0px}.map-main .v33-board[open]{height:calc(100% - 140px)!important}}
+@media (max-width:720px), (max-width:1100px) and (max-height:550px) and (any-pointer:coarse), (min-width:721px) and (max-width:1100px) and (orientation:portrait) and (any-pointer:coarse){
+ /* Keep active routes ahead of optional tools, while location and favourites stay accessible. */
+ .sidebar>.fleet-section{order:6}.sidebar>.v31-alerts{order:7}.sidebar>.preferences-section{order:8}.sidebar>.detail-section{order:9}.sidebar>.sidebar-footer{order:10}
+ .sidebar #routeSearch::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none;display:none}
+ .sidebar #routeSearch::-ms-clear{display:none}
+ .sidebar .fleet-section .section-heading{padding-top:8px}
+ .sidebar .search-wrap input{width:100%}
+ .sidebar .detail-section .fleet-profile-text{min-width:0;overflow-wrap:anywhere}
+}

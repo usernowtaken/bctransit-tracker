@@ -1,4 +1,4 @@
-// V3.4.11 asset mapping and transparent gallery checks.
+// V4.0 Alpha asset mapping and transparent gallery checks.
 const fs=require('fs'), path=require('path'), assert=require('assert');
 const root=path.join(__dirname,'..');
 const src=fs.readFileSync(path.join(root,'web','app.js'),'utf8');
@@ -24,4 +24,4 @@ assert.strictEqual(choose({model_key:'light_duty',fleet_number:'2819'}).id,'hand
 assert(gallery.includes('/buses/vicinity35.png'));
 assert(gallery.includes('/buses/handydart_old.png'));
 assert(gallery.includes('/buses/handydart_new.png'));
-console.log('V3.4.11 asset update mapping PASS');
+console.log('V4.0 Alpha asset update mapping PASS');

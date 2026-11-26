@@ -45,7 +45,7 @@
 html[data-theme="dark"] .location-consent{border-color:#64686b}
 html[data-theme="dark"] .locate-button{border-color:#666}
 html[data-theme="dark"] .locate-button.active{color:#b7d6ff;background:#27405d}
-@media(max-width:720px){
+@media (max-width:720px), (max-width:1100px) and (max-height:550px) and (any-pointer:coarse), (min-width:721px) and (max-width:1100px) and (orientation:portrait) and (any-pointer:coarse){
   .list-toolbar-v28{grid-template-columns:45px minmax(0,1fr) 34px minmax(0,1fr);gap:7px!important}
   .list-toolbar-v28 select{min-height:45px;font-size:13px}
   .list-toolbar-v28 .mini-button{min-height:44px;font-size:13px}
@@ -75,4 +75,4 @@ html[data-theme="dark"] .locate-button.active{color:#b7d6ff;background:#27405d}
 .health-state{font-weight:700;color:var(--muted)}
 .health-state.good{color:#267447}
 .health-state.stale{color:#b06f10}
-@media(max-width:720px){.system-health-header .mini-button{min-height:42px}}
+@media (max-width:720px), (max-width:1100px) and (max-height:550px) and (any-pointer:coarse), (min-width:721px) and (max-width:1100px) and (orientation:portrait) and (any-pointer:coarse){.system-health-header .mini-button{min-height:42px}}

@@ -27,7 +27,7 @@
 .v32-board-bus:hover,.v32-board-stopname:hover{text-decoration:underline}
 /* Appearance/roof picker removed; auto appearance remains model driven. */
 .nova-roof-panel{display:none!important}
-@media(max-width:720px){
+@media (max-width:720px), (max-width:1100px) and (max-height:550px) and (any-pointer:coarse), (min-width:721px) and (max-width:1100px) and (orientation:portrait) and (any-pointer:coarse){
  .v32-board{left:10px;bottom:max(88px,calc(77px + env(safe-area-inset-bottom, 0px)));width:min(350px,calc(100% - 20px));max-height:min(54dvh,475px);z-index:620}
  .v32-board[open]{height:auto;max-height:min(54dvh,475px)}
  .v32-board-body{max-height:calc(min(54dvh,475px) - 51px)}

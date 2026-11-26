@@ -41,7 +41,7 @@
 .v34-settings-head .v34-kicker:empty {display:none !important;}
 .v34-settings .v34-field small:empty, .v34-settings .v34-check small:empty {display:none !important;}
 /* Don't constrain user-selected larger text or touch accessibility. */
-@media(max-width:720px){
+@media (max-width:720px), (max-width:1100px) and (max-height:550px) and (any-pointer:coarse), (min-width:721px) and (max-width:1100px) and (orientation:portrait) and (any-pointer:coarse){
  .v343-quick-actions button,.v343-secondary-actions button {min-height:44px;}
  .v343-quick-actions {gap:8px;}
  .v343-secondary-actions {gap:6px;}
